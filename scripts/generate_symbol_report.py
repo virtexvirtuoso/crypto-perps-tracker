@@ -1267,27 +1267,39 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
         plt.style.use('default')
         return chart_bytes
 
-    # Helper function to get color based on beta
-    def get_beta_color(beta):
-        if beta > 1.5:
-            return '#FF6B35'
-        elif beta > 1.0:
-            return '#FFA500'
-        elif beta > 0.5:
-            return '#FDB44B'
-        elif beta > 0:
-            return '#FFD700'
-        else:
-            return '#00FF7F'
+    # Create a diverse color palette (excluding orange for BTC)
+    color_palette = [
+        '#00FF7F',  # Spring Green
+        '#FF1493',  # Deep Pink
+        '#00CED1',  # Dark Turquoise
+        '#FFD700',  # Gold
+        '#FF6347',  # Tomato
+        '#7B68EE',  # Medium Slate Blue
+        '#FF69B4',  # Hot Pink
+        '#20B2AA',  # Light Sea Green
+        '#FF8C00',  # Dark Orange
+        '#9370DB',  # Medium Purple
+        '#32CD32',  # Lime Green
+        '#FF4500',  # Orange Red
+        '#00BFFF',  # Deep Sky Blue
+        '#ADFF2F',  # Green Yellow
+        '#FF00FF',  # Magenta
+        '#00FA9A',  # Medium Spring Green
+        '#DC143C',  # Crimson
+        '#00FFFF',  # Cyan
+        '#FF1493',  # Deep Pink
+        '#7FFF00',  # Chartreuse
+    ]
 
     # Create beta lookup
     beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
 
-    # Create figure
-    fig, ax = plt.subplots(figsize=(16, 10))
+    # Create figure with extra space for legend
+    fig, ax = plt.subplots(figsize=(18, 10))
 
     # Collect symbol data for legend ordering
     symbol_data = []
+    color_index = 0
 
     # Plot each symbol
     for symbol, candles in historical_data.items():
@@ -1301,21 +1313,35 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
 
         # Get beta and color
         beta = beta_lookup.get(symbol, 1.0)
-        color = get_beta_color(beta)
+
+        # BTC gets orange, all others get unique colors from palette
+        if symbol == 'BTC':
+            color = '#FFA500'
+        else:
+            color = color_palette[color_index % len(color_palette)]
+            color_index += 1
+
         linewidth = 4 if symbol == 'BTC' else 2
-        alpha = 1.0 if symbol == 'BTC' else 0.7
+        alpha = 1.0 if symbol == 'BTC' else 0.8
 
         # Plot line with label for legend
         line, = ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
                        alpha=alpha, label=symbol)
 
-        # Collect for ordering
+        # Add inline label at end of line
         if timestamps and percent_changes:
+            final_x = timestamps[-1]
+            final_y = percent_changes[-1]
+            ax.text(final_x, final_y, f' {symbol}',
+                   fontsize=6, color=color, fontweight='bold',
+                   ha='left', va='center', alpha=0.9)
+
             symbol_data.append({
                 'symbol': symbol,
-                'final_y': percent_changes[-1],
+                'final_y': final_y,
                 'beta': beta,
-                'line': line
+                'line': line,
+                'color': color
             })
 
     # Zero line
@@ -1341,18 +1367,28 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     # Sort symbols by final y-position (top to bottom) for ordered legend
     symbol_data.sort(key=lambda d: d['final_y'], reverse=True)
 
-    # Create ordered legend handles and labels
+    # Create ordered legend handles and labels with matching colors
     handles = [d['line'] for d in symbol_data]
     labels = [d['symbol'] for d in symbol_data]
 
-    # Add legend on the right side
+    # Add legend on the right side with multiple columns for vertical space
+    num_symbols = len(labels)
+    ncols = 3 if num_symbols > 30 else 2 if num_symbols > 15 else 1
+
     legend = ax.legend(handles, labels,
-                      fontsize=7,
-                      framealpha=0.9,
+                      fontsize=8,
+                      framealpha=0.95,
                       loc='center left',
                       bbox_to_anchor=(1.01, 0.5),
-                      ncol=1)
-    plt.setp(legend.get_texts(), color='#FFD700')
+                      ncol=ncols,
+                      columnspacing=1.5)
+
+    # Match text colors to line colors
+    for i, text in enumerate(legend.get_texts()):
+        if i < len(symbol_data):
+            text.set_color(symbol_data[i]['color'])
+            text.set_fontweight('bold')
+
     legend.get_frame().set_facecolor('#1a1a1a')
     legend.get_frame().set_edgecolor('#FFA500')
     legend.get_frame().set_linewidth(2)
