@@ -1372,17 +1372,13 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     handles = [d['line'] for d in symbol_data]
     labels = [d['symbol'] for d in symbol_data]
 
-    # Add legend on the right side with multiple columns for vertical space
-    num_symbols = len(labels)
-    ncols = 3 if num_symbols > 30 else 2 if num_symbols > 15 else 1
-
+    # Add legend on the right side in a single column
     legend = ax.legend(handles, labels,
                       fontsize=8,
                       framealpha=0.95,
                       loc='center left',
                       bbox_to_anchor=(1.01, 0.5),
-                      ncol=ncols,
-                      columnspacing=1.5)
+                      ncol=1)
 
     # Match text colors to line colors
     for i, text in enumerate(legend.get_texts()):
