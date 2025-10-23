@@ -587,9 +587,9 @@ def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, 
     ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
 
     # Formatting
-    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_xlabel('Time (12h Period)', fontsize=14, fontweight='bold', color='#FFD700')
     ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
-    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
+    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (12h)',
                 fontsize=18, fontweight='bold', color='#FFA500', pad=20)
 
     # Format x-axis
@@ -839,7 +839,7 @@ def format_symbol_report(symbol_data: Dict[str, List[Dict]], top_n: int = 20) ->
     output.append("\n" + "="*150)
     output.append(f"TOP {top_n} SYMBOLS BY VOLUME")
     output.append("="*150)
-    output.append(f"{'Rank':<5}{'Symbol':<8}{'Volume (24h)':<15}{'OI':<15}{'Exchanges':<12}{'Avg Price':<14}{'Spread':<10}{'Funding':<10}{'24h Δ'}")
+    output.append(f"{'Rank':<5}{'Symbol':<8}{'Volume (12h)':<15}{'OI':<15}{'Exchanges':<12}{'Avg Price':<14}{'Spread':<10}{'Funding':<10}{'24h Δ'}")
     output.append("-"*150)
 
     for i, analysis in enumerate(analyses[:top_n], 1):
@@ -1286,8 +1286,8 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     # Create figure
     fig, ax = plt.subplots(figsize=(16, 10))
 
-    # Collect label data for smart positioning
-    label_data = []
+    # Collect symbol data for legend ordering
+    symbol_data = []
 
     # Plot each symbol
     for symbol, candles in historical_data.items():
@@ -1305,62 +1305,26 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
         linewidth = 4 if symbol == 'BTC' else 2
         alpha = 1.0 if symbol == 'BTC' else 0.7
 
-        # Plot line
-        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
-                alpha=alpha, label=symbol if symbol == 'BTC' else None)
+        # Plot line with label for legend
+        line, = ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
+                       alpha=alpha, label=symbol)
 
-        # Collect label data
+        # Collect for ordering
         if timestamps and percent_changes:
-            label_data.append({
-                'x': timestamps[-1],
-                'y': percent_changes[-1],
+            symbol_data.append({
                 'symbol': symbol,
-                'color': color,
-                'bold': symbol == 'BTC'
+                'final_y': percent_changes[-1],
+                'beta': beta,
+                'line': line
             })
-
-    # Sort labels by y-position to enable smart spacing
-    label_data.sort(key=lambda d: d['y'])
-
-    # Add labels with overlap prevention
-    min_spacing = 2.5  # Minimum vertical spacing between labels in percentage points
-    texts = []
-
-    for i, data in enumerate(label_data):
-        # Adjust y-position if too close to previous label
-        adjusted_y = data['y']
-        if i > 0:
-            prev_y = label_data[i-1].get('adjusted_y', label_data[i-1]['y'])
-            if abs(adjusted_y - prev_y) < min_spacing:
-                # Space labels out
-                adjusted_y = prev_y + min_spacing if adjusted_y >= prev_y else prev_y - min_spacing
-
-        label_data[i]['adjusted_y'] = adjusted_y
-
-        # Create text label
-        text = ax.text(data['x'], adjusted_y, f"  {data['symbol']}",
-                      va='center', ha='left', color=data['color'], fontsize=10,
-                      fontweight='bold' if data['bold'] else 'normal',
-                      bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
-                               edgecolor=data['color'], alpha=0.8, linewidth=1))
-        texts.append(text)
-
-    # Try to use adjustText for even better positioning
-    try:
-        from adjustText import adjust_text
-        adjust_text(texts, ax=ax,
-                   only_move={'text': 'y'},  # Only adjust vertically
-                   arrowprops=dict(arrowstyle='-', color='#888888', lw=0.5, alpha=0.3))
-    except ImportError:
-        pass  # Use manual spacing only
 
     # Zero line
     ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
 
     # Formatting
-    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_xlabel('Time (12h Period)', fontsize=14, fontweight='bold', color='#FFD700')
     ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
-    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
+    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (12h)',
                 fontsize=18, fontweight='bold', color='#FFA500', pad=20)
 
     # Format x-axis
@@ -1368,19 +1332,29 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
     fig.autofmt_xdate()
 
-    # Grid and styling
-    ax.grid(alpha=0.2, color='#FFD700', linewidth=0.8)
+    # Styling (no grid)
     ax.tick_params(colors='#FFD700', labelsize=11)
     ax.set_facecolor('#0a0a0a')
     fig.patch.set_facecolor('#0a0a0a')
 
-    # Legend
-    if ax.get_legend_handles_labels()[0]:
-        legend = ax.legend(fontsize=12, framealpha=0.9, loc='upper left')
-        plt.setp(legend.get_texts(), color='#FFD700')
-        legend.get_frame().set_facecolor('#1a1a1a')
-        legend.get_frame().set_edgecolor('#FFA500')
-        legend.get_frame().set_linewidth(2)
+    # Sort symbols by final y-position (top to bottom) for ordered legend
+    symbol_data.sort(key=lambda d: d['final_y'], reverse=True)
+
+    # Create ordered legend handles and labels
+    handles = [d['line'] for d in symbol_data]
+    labels = [d['symbol'] for d in symbol_data]
+
+    # Add legend on the right side
+    legend = ax.legend(handles, labels,
+                      fontsize=10,
+                      framealpha=0.9,
+                      loc='center left',
+                      bbox_to_anchor=(1.01, 0.5),
+                      ncol=1)
+    plt.setp(legend.get_texts(), color='#FFD700')
+    legend.get_frame().set_facecolor('#1a1a1a')
+    legend.get_frame().set_edgecolor('#FFA500')
+    legend.get_frame().set_linewidth(2)
 
     # Add glow effects if available
     try:
