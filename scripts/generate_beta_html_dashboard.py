@@ -21,7 +21,7 @@ import time
 
 def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 24) -> Dict[str, List[Dict]]:
     """
-    Fetch hourly historical OHLCV data for specified symbols from Binance
+    Fetch hourly historical OHLCV data for specified symbols from OKX
 
     Args:
         symbols: List of symbol names (e.g., ['BTC', 'ETH', 'SOL'])
@@ -36,40 +36,45 @@ def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 24) -> Di
 
     for symbol in symbols:
         try:
-            # Binance uses USDT pairs
-            binance_symbol = f"{symbol}USDT"
+            # OKX uses -USDT-SWAP pairs
+            okx_symbol = f"{symbol}-USDT-SWAP"
 
-            url = "https://fapi.binance.com/fapi/v1/klines"
+            url = "https://www.okx.com/api/v5/market/candles"
             params = {
-                'symbol': binance_symbol,
-                'interval': '1h',
+                'instId': okx_symbol,
+                'bar': '1H',
                 'limit': limit
             }
 
             response = requests.get(url, params=params, timeout=10)
 
             if response.status_code == 200:
-                klines = response.json()
+                data = response.json()
 
-                # Parse klines data
-                candles = []
-                for k in klines:
-                    candles.append({
-                        'timestamp': k[0],  # Open time
-                        'open': float(k[1]),
-                        'high': float(k[2]),
-                        'low': float(k[3]),
-                        'close': float(k[4]),
-                        'volume': float(k[5])
-                    })
+                if data.get('code') == '0' and data.get('data'):
+                    klines = data['data']
 
-                historical_data[symbol] = candles
-                print(f"      ✓ {symbol}: {len(candles)} candles")
+                    # Parse klines data (OKX format: [ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm])
+                    candles = []
+                    for k in reversed(klines):  # OKX returns newest first, reverse to get oldest first
+                        candles.append({
+                            'timestamp': int(k[0]),  # Timestamp in ms
+                            'open': float(k[1]),
+                            'high': float(k[2]),
+                            'low': float(k[3]),
+                            'close': float(k[4]),
+                            'volume': float(k[5])
+                        })
+
+                    historical_data[symbol] = candles
+                    print(f"      ✓ {symbol}: {len(candles)} candles")
+                else:
+                    print(f"      ⚠️  {symbol}: API returned error")
             else:
                 print(f"      ⚠️  {symbol}: Failed to fetch (status {response.status_code})")
 
             # Rate limiting
-            time.sleep(0.1)
+            time.sleep(0.15)
 
         except Exception as e:
             print(f"      ❌ {symbol}: {e}")
@@ -127,38 +132,8 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
     # === Chart 2 Data: Beta Distribution Histogram ===
     all_betas = [a['btc_beta'] for a in symbols_with_beta]
 
-    # === Chart 3 Data: Beta Champions by Category ===
-    high_beta = sorted([a for a in symbols_with_beta if a['btc_beta'] > 1.5],
-                      key=lambda x: x['total_volume_24h'], reverse=True)[:5]
-    amplifies_btc = sorted([a for a in symbols_with_beta if 1.0 < a['btc_beta'] <= 1.5],
-                           key=lambda x: x['total_volume_24h'], reverse=True)[:5]
-    inverse = sorted([a for a in symbols_with_beta if a['btc_beta'] < 0],
-                    key=lambda x: x['total_volume_24h'], reverse=True)[:5]
-
-    champions_data = {
-        'categories': [],
-        'symbols': [],
-        'betas': [],
-        'colors': []
-    }
-
-    for a in high_beta:
-        champions_data['categories'].append('High Volatility (>1.5x)')
-        champions_data['symbols'].append(a['symbol'][:8])
-        champions_data['betas'].append(a['btc_beta'])
-        champions_data['colors'].append('#FF6B35')
-
-    for a in amplifies_btc:
-        champions_data['categories'].append('Amplifies BTC (1.0-1.5x)')
-        champions_data['symbols'].append(a['symbol'][:8])
-        champions_data['betas'].append(a['btc_beta'])
-        champions_data['colors'].append('#FFA500')
-
-    for a in inverse:
-        champions_data['categories'].append('Inverse (<0)')
-        champions_data['symbols'].append(a['symbol'][:8])
-        champions_data['betas'].append(a['btc_beta'])
-        champions_data['colors'].append('#00FF7F')
+    # === Chart 3 Data: Time Series (uses historical_data parameter) ===
+    # Data is fetched externally and passed to this function
 
     # === Chart 4 Data: Beta vs Volume Bubble ===
     top_volume = sorted(symbols_with_beta, key=lambda x: x['total_volume_24h'], reverse=True)[:50]
@@ -481,11 +456,11 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
             <div id="chart2"></div>
         </div>
 
-        <div class="chart-container">
-            <div class="chart-title">🏆 Beta Champions</div>
+        <div class="chart-container" style="grid-column: 1 / -1;">
+            <div class="chart-title">📊 Individual Symbol Movements vs Bitcoin</div>
             <div class="chart-description">
-                Top symbols from each beta category sorted by volume.
-                Use for targeted exposure strategies.
+                Each line represents one symbol's 24h price movement compared to Bitcoin's baseline.
+                Steeper lines = higher volatility. Color = beta category. Hover for details.
             </div>
             <div id="chart3"></div>
         </div>
@@ -551,15 +526,6 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
                 Larger area = stronger across all dimensions.
             </div>
             <div id="chart10"></div>
-        </div>
-
-        <div class="chart-container" style="grid-column: 1 / -1;">
-            <div class="chart-title">📊 Individual Symbol Movements vs Bitcoin</div>
-            <div class="chart-description">
-                Each line represents one symbol's 24h price movement compared to Bitcoin's baseline.
-                Steeper lines = higher volatility. Color = beta category. Hover for details.
-            </div>
-            <div id="chart11"></div>
         </div>
     </div>
 
@@ -753,28 +719,84 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
 
         Plotly.newPlot('chart2', chart2Data, chart2Layout, {{responsive: true}});
 
-        // Chart 3: Beta Champions
-        var chart3Data = [{{
-            type: 'bar',
-            y: {json.dumps(champions_data['symbols'])},
-            x: {json.dumps(champions_data['betas'])},
-            orientation: 'h',
-            marker: {{
-                color: {json.dumps(champions_data['colors'])},
+        // Chart 3: Time Series - Individual Symbol Price Movements
+        var historicalData = {json.dumps(historical_data) if historical_data else '{}'};
+
+        // Helper function to get color based on beta
+        function getBetaColor(beta) {{
+            if (beta > 1.5) return '#FF6B35';
+            if (beta > 1.0) return '#FFA500';
+            if (beta > 0.5) return '#FDB44B';
+            if (beta > 0) return '#FFD700';
+            return '#00FF7F';
+        }}
+
+        // Create time series traces
+        var chart3Data = [];
+        var chart3Annotations = [];
+
+        // Get symbols with historical data
+        var symbolsInChart = Object.keys(historicalData);
+
+        // Process each symbol
+        for (let symbol of symbolsInChart) {{
+            let candles = historicalData[symbol];
+            if (!candles || candles.length === 0) continue;
+
+            // Normalize to percentage change from first candle
+            let initialPrice = candles[0].close;
+            let timestamps = candles.map(c => new Date(c.timestamp));
+            let percentChanges = candles.map(c => ((c.close - initialPrice) / initialPrice) * 100);
+
+            // Get beta for color (find in analyses)
+            let beta = 1.0;  // Default
+            let symbolAnalysis = {json.dumps({a['symbol']: a.get('btc_beta', 1.0) for a in symbols_with_beta})};
+            if (symbolAnalysis[symbol]) {{
+                beta = symbolAnalysis[symbol];
+            }}
+
+            let color = getBetaColor(beta);
+            let lineWidth = (symbol === 'BTC') ? 4 : 2;
+            let opacity = (symbol === 'BTC') ? 1.0 : 0.7;
+
+            chart3Data.push({{
+                type: 'scatter',
+                mode: 'lines',
+                x: timestamps,
+                y: percentChanges,
+                name: symbol,
                 line: {{
-                    color: '#FFA500',
-                    width: 2
-                }}
-            }},
-            text: {json.dumps([f'{b:.2f}x' for b in champions_data['betas']])},
-            textposition: 'outside',
-            textfont: {{
-                color: '#FFD700',
-                size: 12
-            }},
-            hovertemplate: '<b>%{{y}}</b><br>Beta: %{{x:.2f}}x<br>Category: %{{text}}<extra></extra>',
-            customdata: {json.dumps(champions_data['categories'])}
-        }}];
+                    color: color,
+                    width: lineWidth,
+                    opacity: opacity
+                }},
+                hovertemplate: '<b>' + symbol + '</b><br>%{{x}}<br>Change: %{{y:.2f}}%<br>Beta: ' + beta.toFixed(2) + 'x<extra></extra>',
+                showlegend: (symbol === 'BTC'),
+                legendgroup: symbol
+            }});
+
+            // Add label annotation on the right side
+            let lastTimestamp = timestamps[timestamps.length - 1];
+            let lastChange = percentChanges[percentChanges.length - 1];
+
+            chart3Annotations.push({{
+                x: lastTimestamp,
+                y: lastChange,
+                xref: 'x',
+                yref: 'y',
+                text: symbol,
+                showarrow: false,
+                xanchor: 'left',
+                xshift: 5,
+                font: {{
+                    color: color,
+                    size: 10,
+                    weight: (symbol === 'BTC') ? 'bold' : 'normal'
+                }},
+                bgcolor: 'rgba(0,0,0,0.8)',
+                borderpad: 2
+            }});
+        }}
 
         var chart3Layout = {{
             paper_bgcolor: 'rgba(0,0,0,0)',
@@ -784,35 +806,45 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
                 family: 'Courier New'
             }},
             xaxis: {{
-                title: 'Bitcoin Beta',
+                title: 'Time (24h Period)',
+                gridcolor: 'rgba(255, 215, 0, 0.1)',
+                color: '#FFD700',
+                type: 'date'
+            }},
+            yaxis: {{
+                title: 'Price Change (%)',
                 gridcolor: 'rgba(255, 215, 0, 0.1)',
                 color: '#FFD700',
                 zeroline: true,
                 zerolinecolor: '#888888',
                 zerolinewidth: 2
             }},
-            yaxis: {{
-                gridcolor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
-                autorange: 'reversed'
-            }},
             shapes: [
                 {{
                     type: 'line',
-                    x0: 1.0,
-                    x1: 1.0,
-                    y0: -0.5,
-                    y1: {len(champions_data['symbols']) - 0.5},
+                    xref: 'paper',
+                    x0: 0,
+                    x1: 1,
+                    y0: 0,
+                    y1: 0,
                     line: {{
-                        color: '#FFA500',
+                        color: '#888888',
                         width: 2,
-                        dash: 'dash'
+                        dash: 'solid'
                     }}
                 }}
             ],
-            margin: {{ l: 80, r: 40, t: 20, b: 60 }},
-            height: 500,
-            showlegend: false
+            annotations: chart3Annotations,
+            margin: {{ l: 60, r: 100, t: 20, b: 80 }},
+            height: 700,
+            hovermode: 'x unified',
+            legend: {{
+                x: 0.02,
+                y: 0.98,
+                bgcolor: 'rgba(0,0,0,0.7)',
+                bordercolor: '#FFA500',
+                borderwidth: 2
+            }}
         }};
 
         Plotly.newPlot('chart3', chart3Data, chart3Layout, {{responsive: true}});
@@ -1251,112 +1283,6 @@ def generate_beta_html_dashboard(analyses: List[Dict], btc_price_change: float =
         }};
 
         Plotly.newPlot('chart10', chart10Data, chart10Layout, {{responsive: true}});
-
-        // Chart 11: Time Series - Individual Symbol Price Movements
-        var historicalData = {json.dumps(historical_data) if historical_data else '{}'};
-
-        // Helper function to get color based on beta
-        function getBetaColor(beta) {{
-            if (beta > 1.5) return '#FF6B35';
-            if (beta > 1.0) return '#FFA500';
-            if (beta > 0.5) return '#FDB44B';
-            if (beta > 0) return '#FFD700';
-            return '#00FF7F';
-        }}
-
-        // Create time series traces
-        var chart11Data = [];
-
-        // Get symbols with historical data
-        var symbolsInChart = Object.keys(historicalData);
-
-        // Process each symbol
-        for (let symbol of symbolsInChart) {{
-            let candles = historicalData[symbol];
-            if (!candles || candles.length === 0) continue;
-
-            // Normalize to percentage change from first candle
-            let initialPrice = candles[0].close;
-            let timestamps = candles.map(c => new Date(c.timestamp));
-            let percentChanges = candles.map(c => ((c.close - initialPrice) / initialPrice) * 100);
-
-            // Get beta for color (find in analyses)
-            let beta = 1.0;  // Default
-            let symbolAnalysis = {json.dumps({a['symbol']: a.get('btc_beta', 1.0) for a in symbols_with_beta})};
-            if (symbolAnalysis[symbol]) {{
-                beta = symbolAnalysis[symbol];
-            }}
-
-            let color = getBetaColor(beta);
-            let lineWidth = (symbol === 'BTC') ? 4 : 2;
-            let opacity = (symbol === 'BTC') ? 1.0 : 0.7;
-
-            chart11Data.push({{
-                type: 'scatter',
-                mode: 'lines',
-                x: timestamps,
-                y: percentChanges,
-                name: symbol,
-                line: {{
-                    color: color,
-                    width: lineWidth,
-                    opacity: opacity
-                }},
-                hovertemplate: '<b>' + symbol + '</b><br>%{{x}}<br>Change: %{{y:.2f}}%<br>Beta: ' + beta.toFixed(2) + 'x<extra></extra>',
-                showlegend: (symbol === 'BTC'),
-                legendgroup: symbol
-            }});
-        }}
-
-        var chart11Layout = {{
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: {{
-                color: '#FFD700',
-                family: 'Courier New'
-            }},
-            xaxis: {{
-                title: 'Time (24h Period)',
-                gridcolor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
-                type: 'date'
-            }},
-            yaxis: {{
-                title: 'Price Change (%)',
-                gridcolor: 'rgba(255, 215, 0, 0.1)',
-                color: '#FFD700',
-                zeroline: true,
-                zerolinecolor: '#888888',
-                zerolinewidth: 2
-            }},
-            shapes: [
-                {{
-                    type: 'line',
-                    xref: 'paper',
-                    x0: 0,
-                    x1: 1,
-                    y0: 0,
-                    y1: 0,
-                    line: {{
-                        color: '#888888',
-                        width: 2,
-                        dash: 'solid'
-                    }}
-                }}
-            ],
-            margin: {{ l: 60, r: 40, t: 20, b: 80 }},
-            height: 700,
-            hovermode: 'x unified',
-            legend: {{
-                x: 0.02,
-                y: 0.98,
-                bgcolor: 'rgba(0,0,0,0.7)',
-                bordercolor: '#FFA500',
-                borderwidth: 2
-            }}
-        }};
-
-        Plotly.newPlot('chart11', chart11Data, chart11Layout, {{responsive: true}});
     </script>
 </body>
 </html>
