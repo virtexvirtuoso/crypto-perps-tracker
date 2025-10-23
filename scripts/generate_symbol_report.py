@@ -1332,7 +1332,8 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
     fig.autofmt_xdate()
 
-    # Styling (no grid)
+    # Styling (very subtle grid)
+    ax.grid(alpha=0.08, color='#FFD700', linewidth=0.5)
     ax.tick_params(colors='#FFD700', labelsize=7)
     ax.set_facecolor('#0a0a0a')
     fig.patch.set_facecolor('#0a0a0a')
