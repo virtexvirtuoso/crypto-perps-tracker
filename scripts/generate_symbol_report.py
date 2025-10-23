@@ -1796,7 +1796,8 @@ if __name__ == "__main__":
         with open('config/config.yaml', 'r') as f:
             content = f.read()
             # Substitute environment variables
-            content = os.expandvars(content)
+            from os.path import expandvars
+            content = expandvars(content)
             config = yaml.safe_load(content)
 
         discord_config = config.get('discord', {})
