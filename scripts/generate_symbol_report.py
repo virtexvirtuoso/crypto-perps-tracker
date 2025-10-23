@@ -1295,7 +1295,7 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
 
     # Create figure with extra space for legend
-    fig, ax = plt.subplots(figsize=(18, 10))
+    fig, ax = plt.subplots(figsize=(16, 10))
 
     # Collect symbol data for legend ordering
     symbol_data = []
@@ -1394,12 +1394,12 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     legend.get_frame().set_edgecolor('#FFA500')
     legend.get_frame().set_linewidth(2)
 
-    # Add glow effects if available
-    try:
-        import mplcyberpunk
-        mplcyberpunk.add_glow_effects(ax=ax)
-    except (ImportError, TypeError):
-        pass
+    # Skip glow effects to prevent rendering issues
+    # try:
+    #     import mplcyberpunk
+    #     mplcyberpunk.add_glow_effects(ax=ax)
+    # except (ImportError, TypeError):
+    #     pass
 
     # Save to bytes
     plt.tight_layout()
