@@ -1762,10 +1762,13 @@ if __name__ == "__main__":
     chart_filename = os.path.join(data_dir, f"bitcoin_beta_chart_{timestamp}.png")
 
     print("🎨 Generating Bitcoin Beta time-series chart...")
-    if generate_time_series_chart(analyses, historical_data, chart_filename):
+    try:
+        chart_bytes = generate_bitcoin_beta_chart_timeseries(analyses, historical_data)
+        with open(chart_filename, 'wb') as f:
+            f.write(chart_bytes)
         print(f"   ✓ Chart saved to: {chart_filename}\n")
-    else:
-        print(f"   ⚠️  Chart generation failed\n")
+    except Exception as e:
+        print(f"   ⚠️  Chart generation failed: {e}\n")
 
     # Generate report
     report = format_symbol_report(symbol_data, top_n=20)
