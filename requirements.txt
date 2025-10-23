@@ -9,7 +9,7 @@ python-dotenv>=1.0.0
 
 # Data handling (optional, for future features)
 # pandas>=2.0.0
-# numpy>=1.24.0
+numpy>=1.24.0
 
 # Configuration (required for Discord integration)
 pyyaml>=6.0
@@ -17,8 +17,8 @@ pyyaml>=6.0
 # For future database features
 # sqlalchemy>=2.0.0
 
-# For future visualization
-# matplotlib>=3.7.0
+# Visualization (required for chart generation)
+matplotlib>=3.7.0
 # plotly>=5.14.0
 
 # Development dependencies (optional)
