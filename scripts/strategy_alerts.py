@@ -4,10 +4,16 @@ Trading Strategy Alert System
 Monitors market conditions and alerts when optimal strategies are detected
 """
 
+import sys
+import os
 import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 import yaml
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from generate_market_report import (
     fetch_all_enhanced,
@@ -19,10 +25,13 @@ from generate_market_report import (
 
 
 def load_config() -> Dict:
-    """Load configuration"""
+    """Load configuration from YAML file with environment variable substitution"""
     try:
         with open('config/config.yaml', 'r') as f:
-            return yaml.safe_load(f)
+            content = f.read()
+            # Substitute environment variables
+            content = os.path.expandvars(content)
+            return yaml.safe_load(content)
     except Exception as e:
         print(f"Warning: Could not load config: {e}")
         return {}
