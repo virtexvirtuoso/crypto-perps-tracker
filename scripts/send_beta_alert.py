@@ -20,10 +20,75 @@ from typing import List, Dict
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import time
 
 
-def generate_beta_champions_chart(analyses: List[Dict], top_n: int = 15) -> bytes:
-    """Generate single Beta Champions chart with Cyberpunk Amber styling"""
+def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 24) -> Dict[str, List[Dict]]:
+    """
+    Fetch hourly historical OHLCV data for specified symbols from OKX
+
+    Args:
+        symbols: List of symbol names (e.g., ['BTC', 'ETH', 'SOL'])
+        limit: Number of hourly candles to fetch (default 24 for 24 hours)
+
+    Returns:
+        Dict mapping symbol -> list of {timestamp, open, high, low, close, volume}
+    """
+    historical_data = {}
+
+    print(f"   📊 Fetching {limit}h historical data for {len(symbols)} symbols...")
+
+    for symbol in symbols:
+        try:
+            # OKX uses -USDT-SWAP pairs
+            okx_symbol = f"{symbol}-USDT-SWAP"
+
+            url = "https://www.okx.com/api/v5/market/candles"
+            params = {
+                'instId': okx_symbol,
+                'bar': '1H',
+                'limit': limit
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get('code') == '0' and data.get('data'):
+                    klines = data['data']
+
+                    # Parse klines data (OKX format: [ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm])
+                    candles = []
+                    for k in reversed(klines):  # OKX returns newest first, reverse to get oldest first
+                        candles.append({
+                            'timestamp': int(k[0]),  # Timestamp in ms
+                            'open': float(k[1]),
+                            'high': float(k[2]),
+                            'low': float(k[3]),
+                            'close': float(k[4]),
+                            'volume': float(k[5])
+                        })
+
+                    historical_data[symbol] = candles
+                    print(f"      ✓ {symbol}: {len(candles)} candles")
+                else:
+                    print(f"      ⚠️  {symbol}: API returned error")
+            else:
+                print(f"      ⚠️  {symbol}: Failed to fetch (status {response.status_code})")
+
+            # Rate limiting
+            time.sleep(0.15)
+
+        except Exception as e:
+            print(f"      ❌ {symbol}: {e}")
+
+    return historical_data
+
+
+def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, List[Dict]]) -> bytes:
+    """Generate time-series chart showing individual symbol movements vs Bitcoin"""
 
     # Apply style
     try:
@@ -32,13 +97,10 @@ def generate_beta_champions_chart(analyses: List[Dict], top_n: int = 15) -> byte
     except ImportError:
         plt.style.use('dark_background')
 
-    # Get symbols with beta data
-    symbols_with_beta = [a for a in analyses if a.get('btc_beta') is not None and a['symbol'] != 'BTC']
-
-    if not symbols_with_beta:
+    if not historical_data:
         # Return empty chart if no data
-        fig, ax = plt.subplots(figsize=(14, 10))
-        ax.text(0.5, 0.5, 'No Beta Data Available', ha='center', va='center', fontsize=24, color='#FFA500')
+        fig, ax = plt.subplots(figsize=(16, 10))
+        ax.text(0.5, 0.5, 'No Historical Data Available', ha='center', va='center', fontsize=24, color='#FFA500')
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.axis('off')
@@ -50,103 +112,80 @@ def generate_beta_champions_chart(analyses: List[Dict], top_n: int = 15) -> byte
         plt.style.use('default')
         return chart_bytes
 
-    # Sort by volume for each category
-    high_beta = sorted([a for a in symbols_with_beta if a['btc_beta'] > 1.5],
-                      key=lambda x: x['total_volume_24h'], reverse=True)[:top_n//3]
-    amplifies_btc = sorted([a for a in symbols_with_beta if 1.0 < a['btc_beta'] <= 1.5],
-                           key=lambda x: x['total_volume_24h'], reverse=True)[:top_n//3]
-    inverse = sorted([a for a in symbols_with_beta if a['btc_beta'] < 0],
-                    key=lambda x: x['total_volume_24h'], reverse=True)[:top_n//3]
+    # Helper function to get color based on beta
+    def get_beta_color(beta):
+        if beta > 1.5:
+            return '#FF6B35'
+        elif beta > 1.0:
+            return '#FFA500'
+        elif beta > 0.5:
+            return '#FDB44B'
+        elif beta > 0:
+            return '#FFD700'
+        else:
+            return '#00FF7F'
 
-    # Prepare data
-    categories = []
-    symbols_list = []
-    betas_list = []
-    colors_list = []
-    volumes_list = []
+    # Create beta lookup
+    beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
 
-    for a in high_beta:
-        categories.append('High Volatility (>1.5x)')
-        symbols_list.append(a['symbol'][:10])
-        betas_list.append(a['btc_beta'])
-        colors_list.append('#FF6B35')
-        volumes_list.append(a['total_volume_24h'] / 1e9)
+    # Create figure
+    fig, ax = plt.subplots(figsize=(16, 10))
 
-    for a in amplifies_btc:
-        categories.append('Amplifies BTC (1.0-1.5x)')
-        symbols_list.append(a['symbol'][:10])
-        betas_list.append(a['btc_beta'])
-        colors_list.append('#FFA500')
-        volumes_list.append(a['total_volume_24h'] / 1e9)
+    # Plot each symbol
+    for symbol, candles in historical_data.items():
+        if not candles:
+            continue
 
-    for a in inverse:
-        categories.append('Inverse (<0)')
-        symbols_list.append(a['symbol'][:10])
-        betas_list.append(a['btc_beta'])
-        colors_list.append('#00FF7F')
-        volumes_list.append(a['total_volume_24h'] / 1e9)
+        # Normalize to percentage change from first candle
+        initial_price = candles[0]['close']
+        timestamps = [datetime.fromtimestamp(c['timestamp'] / 1000) for c in candles]
+        percent_changes = [((c['close'] - initial_price) / initial_price) * 100 for c in candles]
 
-    if not symbols_list:
-        # Return empty chart
-        fig, ax = plt.subplots(figsize=(14, 10))
-        ax.text(0.5, 0.5, 'No Beta Champions Found', ha='center', va='center', fontsize=24, color='#FFA500')
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.axis('off')
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
-        buf.seek(0)
-        chart_bytes = buf.getvalue()
-        plt.close()
-        plt.style.use('default')
-        return chart_bytes
+        # Get beta and color
+        beta = beta_lookup.get(symbol, 1.0)
+        color = get_beta_color(beta)
+        linewidth = 4 if symbol == 'BTC' else 2
+        alpha = 1.0 if symbol == 'BTC' else 0.7
 
-    # Create chart
-    fig, ax = plt.subplots(figsize=(14, 10))
+        # Plot line
+        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
+                alpha=alpha, label=symbol if symbol == 'BTC' else None)
 
-    y_positions = range(len(symbols_list))
-    bars = ax.barh(y_positions, betas_list, color=colors_list,
-                   alpha=0.8, edgecolor='#FFA500', linewidth=2.5)
+        # Add label at the end
+        if timestamps and percent_changes:
+            ax.text(timestamps[-1], percent_changes[-1], f'  {symbol}',
+                   va='center', ha='left', color=color, fontsize=10,
+                   fontweight='bold' if symbol == 'BTC' else 'normal',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
+                            edgecolor=color, alpha=0.8, linewidth=1))
 
-    # Add labels with symbol name, beta, and volume
-    for i, (sym, beta, vol) in enumerate(zip(symbols_list, betas_list, volumes_list)):
-        label_text = f'{sym} ({beta:.2f}x) • ${vol:.1f}B'
-        ax.text(beta if beta > 0 else 0, i, f'  {label_text}',
-                ha='left' if beta > 0 else 'right', va='center',
-                fontsize=11, fontweight='bold', color='#FFD700',
-                bbox=dict(boxstyle='round,pad=0.5', facecolor='#1a1a1a',
-                         edgecolor=colors_list[i], alpha=0.8, linewidth=1.5))
+    # Zero line
+    ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
 
-    # Category dividers
-    category_positions = {}
-    for i, cat in enumerate(categories):
-        if cat not in category_positions:
-            category_positions[cat] = i
-
-    for cat, pos in category_positions.items():
-        if pos > 0:
-            ax.axhline(y=pos - 0.5, color='#FFD700', linestyle='--',
-                      linewidth=1, alpha=0.3)
-
-    ax.set_yticks(y_positions)
-    ax.set_yticklabels([])
-
-    # Reference lines
-    ax.axvline(x=1.0, color='#FFA500', linestyle='--', linewidth=3, alpha=0.8, label='1.0x (Matches BTC)')
-    ax.axvline(x=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
-
-    ax.set_xlabel('Bitcoin Beta', fontsize=14, fontweight='bold', color='#FFD700')
-    ax.set_title('₿ BITCOIN BETA CHAMPIONS\nTop Symbols by Beta Category (Sorted by Volume)',
+    # Formatting
+    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_title('₿ BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
                 fontsize=18, fontweight='bold', color='#FFA500', pad=20)
-    ax.grid(axis='x', alpha=0.2, color='#FFD700', linewidth=0.8)
+
+    # Format x-axis
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    fig.autofmt_xdate()
+
+    # Grid and styling
+    ax.grid(alpha=0.2, color='#FFD700', linewidth=0.8)
     ax.tick_params(colors='#FFD700', labelsize=11)
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
 
     # Legend
-    legend = ax.legend(fontsize=11, framealpha=0.9, loc='lower right')
-    plt.setp(legend.get_texts(), color='#FFD700')
-    legend.get_frame().set_facecolor('#1a1a1a')
-    legend.get_frame().set_edgecolor('#FFA500')
-    legend.get_frame().set_linewidth(2)
+    if ax.get_legend_handles_labels()[0]:
+        legend = ax.legend(fontsize=12, framealpha=0.9, loc='upper left')
+        plt.setp(legend.get_texts(), color='#FFD700')
+        legend.get_frame().set_facecolor('#1a1a1a')
+        legend.get_frame().set_edgecolor('#FFA500')
+        legend.get_frame().set_linewidth(2)
 
     # Add glow effects if available
     try:
@@ -156,6 +195,7 @@ def generate_beta_champions_chart(analyses: List[Dict], top_n: int = 15) -> byte
         pass
 
     # Save to bytes
+    plt.tight_layout()
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
@@ -166,7 +206,7 @@ def generate_beta_champions_chart(analyses: List[Dict], top_n: int = 15) -> byte
     return chart_bytes
 
 
-def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, webhook_url: str) -> bool:
+def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, historical_data: Dict[str, List[Dict]], webhook_url: str) -> bool:
     """Send Bitcoin Beta alert to Discord"""
 
     try:
@@ -200,7 +240,7 @@ def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, we
             "color": 0xFFA500,  # Amber
             "fields": [],
             "footer": {
-                "text": "Beta = Symbol 24h Change / BTC 24h Change • Higher volume = more liquid"
+                "text": "Beta = Symbol 24h Change / BTC 24h Change • Time-series shows 24h price movements"
             },
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -231,8 +271,8 @@ def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, we
             })
 
         # Generate chart
-        print("   • Generating Beta Champions chart...")
-        beta_chart = generate_beta_champions_chart(analyses, top_n=15)
+        print("   • Generating time-series chart...")
+        beta_chart = generate_time_series_chart(analyses, historical_data)
         print("      ✓ Chart generated")
 
         # Prepare files
@@ -303,8 +343,14 @@ if __name__ == "__main__":
     analyses.sort(key=lambda x: x['total_volume_24h'], reverse=True)
     print(f"✅ Analyzed {len(analyses)} symbols\n")
 
+    # Fetch historical data for top 25 symbols (including BTC)
+    print("📈 Fetching historical price data for top 25 symbols...\n")
+    top_symbols = ['BTC'] + [a['symbol'] for a in analyses[:24] if a['symbol'] != 'BTC']
+    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=24)
+    print(f"\n✅ Fetched historical data for {len(historical_data)} symbols\n")
+
     # Send to Discord
     webhook_url = "https://discord.com/api/webhooks/1430641654846459964/QQj9KDof3UNhDj-p3GyrVDDAX1rWjja6D8VfQ92wSaxdsqEot8VD2S_W8J9uQdLT-oR7"
 
     print("📤 Sending Bitcoin Beta alert to Discord...\n")
-    send_beta_alert_to_discord(analyses, btc_price_change if btc_price_change else 0, webhook_url)
+    send_beta_alert_to_discord(analyses, btc_price_change if btc_price_change else 0, historical_data, webhook_url)
