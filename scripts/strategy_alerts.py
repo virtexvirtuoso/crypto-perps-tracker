@@ -555,15 +555,17 @@ def detect_breakout_setup(sentiment: Dict) -> Tuple[bool, Dict]:
     return is_optimal, details
 
 
-def detect_liquidation_cascade_setup(sentiment: Dict) -> Tuple[bool, Dict]:
+def detect_liquidation_cascade_setup(sentiment: Dict, liquidation_metrics: Dict = None) -> Tuple[bool, Dict]:
     """
-    Detect conditions suggesting potential liquidation cascades
+    ENHANCED: Detect liquidation cascade conditions using REAL liquidation data
 
-    Conditions:
+    Conditions (6 factors):
     - Very high leverage (OI/Vol > 0.6)
     - Extreme funding rates (|funding| > 0.015%)
     - Strong directional bias (|score| > 0.4)
     - Recent volatility (price change > 5%)
+    - HIGH recent liquidations (>2% of volume) ⭐ NEW
+    - Elevated cascade risk score (>0.6) ⭐ NEW
 
     This is both a RISK indicator and an OPPORTUNITY for counter-positioning
     """
@@ -572,17 +574,44 @@ def detect_liquidation_cascade_setup(sentiment: Dict) -> Tuple[bool, Dict]:
     conviction = sentiment['factors']['conviction']['value']
     funding_value = sentiment['factors']['funding']['value']
 
+    # NEW: Real liquidation data (if available)
+    if liquidation_metrics and liquidation_metrics.get('total_liquidations', 0) > 0:
+        cascade_risk = liquidation_metrics.get('cascade_risk_score', 0)
+        liq_vol_ratio = liquidation_metrics.get('liquidation_volume_ratio', 0)
+        recent_liquidations = liquidation_metrics.get('total_liquidations', 0)
+        has_liq_data = True
+    else:
+        cascade_risk = 0
+        liq_vol_ratio = 0
+        recent_liquidations = 0
+        has_liq_data = False
+
     # Check conditions
     extreme_leverage = conviction > 0.6
     extreme_funding = abs(funding_value) > 0.015
     directional_bias = abs(score) > 0.4
     has_volatility = price_change > 5.0
+    high_recent_liquidations = liq_vol_ratio > 0.02  # NEW: >2% liquidations
+    elevated_cascade_risk = cascade_risk > 0.6  # NEW: Risk score threshold
 
-    # Need at least 3 conditions
-    conditions_met = sum([extreme_leverage, extreme_funding, directional_bias, has_volatility])
-    is_optimal = conditions_met >= 3
+    # Need at least 4 of 6 conditions (stricter with more data)
+    conditions_met = sum([
+        extreme_leverage,
+        extreme_funding,
+        directional_bias,
+        has_volatility,
+        high_recent_liquidations,
+        elevated_cascade_risk
+    ])
 
-    confidence = min(conditions_met * 25, 100)
+    is_optimal = conditions_met >= 4
+
+    # Base confidence from conditions
+    confidence = min(conditions_met * 17, 100)  # 17% per condition (6 conditions)
+
+    # Bonus confidence if REAL liquidation data shows active cascade
+    if has_liq_data and high_recent_liquidations and elevated_cascade_risk:
+        confidence = min(confidence + 20, 100)  # +20% bonus for confirmed cascade
 
     direction = "LONG" if score > 0 else "SHORT"
     risk_side = "Longs" if score > 0 else "Shorts"
@@ -591,15 +620,49 @@ def detect_liquidation_cascade_setup(sentiment: Dict) -> Tuple[bool, Dict]:
     counter_direction = "SHORT" if score > 0 else "LONG"
     counter_action = "📉 Counter with SHORT" if score > 0 else "📈 Counter with LONG"
 
+    # Determine cascade status
+    if has_liq_data:
+        if high_recent_liquidations:
+            cascade_status = "⚠️ ACTIVE CASCADE"
+        elif elevated_cascade_risk:
+            cascade_status = "🟡 BUILDING RISK"
+        else:
+            cascade_status = "🟢 ELEVATED RISK"
+    else:
+        cascade_status = "⚪ RISK INDICATORS"
+
+    # Build recommendation
+    if is_optimal:
+        rec = f"{cascade_status} DETECTED\n"
+        rec += f"• {risk_side} heavily leveraged (OI/Vol: {conviction:.2f}x)\n"
+
+        if has_liq_data:
+            rec += f"• Recent liquidations: ${recent_liquidations/1e6:.1f}M ({liq_vol_ratio*100:.2f}% of volume)\n"
+            rec += f"• Cascade Risk Score: {cascade_risk:.2f}/1.0 ({liquidation_metrics.get('risk_level', 'UNKNOWN')})\n"
+
+        rec += f"• Extreme funding ({funding_value:.4f}%) suggests crowded trade\n"
+
+        if high_recent_liquidations:
+            rec += f"• ⚠️ CASCADE IN PROGRESS: Liquidations accelerating\n"
+
+        rec += f"• Strategy: {counter_action} with TIGHT stops (high risk)\n"
+        rec += f"• OR reduce leverage immediately if on {risk_side.lower()} side"
+
+        recommendation = rec
+    else:
+        recommendation = None
+
     details = {
-        'strategy': f'Liquidation Cascade Risk ({risk_side})',
+        'strategy': f'Liquidation Cascade Risk ({risk_side}) - {cascade_status}',
         'confidence': confidence,
         'direction': counter_direction,  # Direction is the COUNTER-POSITION opportunity
         'conditions_met': {
             'extreme_leverage': extreme_leverage,
             'extreme_funding': extreme_funding,
             'strong_directional_bias': directional_bias,
-            'high_volatility': has_volatility
+            'high_volatility': has_volatility,
+            'recent_liquidations': high_recent_liquidations,  # NEW
+            'cascade_risk_elevated': elevated_cascade_risk    # NEW
         },
         'metrics': {
             'composite_score': score,
@@ -607,15 +670,14 @@ def detect_liquidation_cascade_setup(sentiment: Dict) -> Tuple[bool, Dict]:
             'funding_rate': funding_value,
             'price_volatility': price_change,
             'at_risk': risk_side,
-            'counter_opportunity': counter_direction
+            'counter_opportunity': counter_direction,
+            'recent_liquidations_usd': recent_liquidations if has_liq_data else None,  # NEW
+            'liquidation_volume_ratio': liq_vol_ratio if has_liq_data else None,      # NEW
+            'cascade_risk_score': cascade_risk if has_liq_data else None,             # NEW
+            'cascade_status': cascade_status,                                          # NEW
+            'liquidation_data_available': has_liq_data                                 # NEW
         },
-        'recommendation': (
-            f"⚠️ LIQUIDATION CASCADE RISK DETECTED\n"
-            f"• {risk_side} heavily leveraged (OI/Vol: {conviction:.2f}x)\n"
-            f"• Extreme funding ({funding_value:.4f}%) suggests crowded trade\n"
-            f"• Risk: Move against {direction.lower()}s could trigger cascade\n"
-            f"• Strategy: EITHER reduce leverage OR {counter_action} with tight stops"
-        ) if is_optimal else None
+        'recommendation': recommendation
     }
 
     return is_optimal, details
@@ -1061,7 +1123,30 @@ def analyze_all_strategies(results: List[Dict]) -> List[Dict]:
     sentiment = analyze_market_sentiment(results)
     arb_opportunities = identify_arbitrage_opportunities(results)
     dominance = calculate_market_dominance(results)
-    basis_metrics = analyze_basis_metrics()  # NEW: Spot-futures basis analysis
+    basis_metrics = analyze_basis_metrics()  # Spot-futures basis analysis
+
+    # NEW: Fetch liquidation data
+    liquidation_metrics = None
+    try:
+        from fetch_liquidations import fetch_all_liquidations, calculate_liquidation_metrics
+
+        # Get total market volume for liquidation ratio calculation
+        successful = [r for r in results if r.get('status') == 'success']
+        total_volume = sum(r['volume'] for r in successful)
+
+        # Fetch liquidations from last hour
+        liq_data = fetch_all_liquidations(hours=1)
+        liquidation_metrics = calculate_liquidation_metrics(liq_data, total_volume)
+
+        # Log if liquidations detected
+        if liquidation_metrics.get('total_liquidations', 0) > 0:
+            print(f"⚠️  Liquidation data: ${liquidation_metrics['total_liquidations']/1e6:.1f}M "
+                  f"(Risk: {liquidation_metrics['risk_level']})")
+
+    except ImportError:
+        print("⚠️  Liquidation tracking not available (fetch_liquidations.py not found)")
+    except Exception as e:
+        print(f"⚠️  Liquidation fetch failed: {e}")
 
     alerts = []
 
@@ -1074,11 +1159,11 @@ def analyze_all_strategies(results: List[Dict]) -> List[Dict]:
         detect_contrarian_setup(sentiment),
         detect_mean_reversion_setup(sentiment),
         detect_breakout_setup(sentiment),
-        detect_liquidation_cascade_setup(sentiment),
+        detect_liquidation_cascade_setup(sentiment, liquidation_metrics),  # ⭐ NOW USES REAL DATA
         detect_volatility_expansion_setup(sentiment),
         detect_momentum_breakout_setup(sentiment),
         detect_delta_neutral_setup(sentiment, arb_opportunities),
-        # NEW: Spot-futures basis strategies
+        # Spot-futures basis strategies
         detect_basis_arbitrage_setup(basis_metrics),
         detect_contango_backwardation_shift(basis_metrics),
         detect_institutional_divergence_setup(basis_metrics)
