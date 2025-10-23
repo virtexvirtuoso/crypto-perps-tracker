@@ -1353,10 +1353,11 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (12h)',
                 fontsize=12, fontweight='bold', color='#FFA500', pad=20)
 
-    # Format x-axis
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
-    fig.autofmt_xdate()
+    # Format x-axis with proper date handling
+    if symbol_data and len(symbol_data) > 0:
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        fig.autofmt_xdate()
 
     # Styling (very subtle grid)
     ax.grid(alpha=0.08, color='#FFD700', linewidth=0.5)
