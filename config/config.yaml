@@ -1,0 +1,77 @@
+# Crypto Perps Tracker Configuration
+# Customize settings for data fetching and analysis
+
+# Exchanges to monitor
+exchanges:
+  cex:
+    - binance
+    - bybit
+    - okx
+    - bitget
+    - gateio
+    - coinbase_intx
+  dex:
+    - hyperliquid
+    - asterdex
+    - dydx
+
+# API timeouts (seconds)
+timeouts:
+  default: 10
+  open_interest: 5  # Faster timeout for OI calls
+
+# Update intervals (for future automation)
+intervals:
+  fetch_interval: 3600  # 1 hour in seconds
+  alert_check: 60      # 1 minute
+
+# Alert thresholds
+alerts:
+  funding_rate:
+    extreme_long: 0.1    # Alert when > 0.1% (extreme long bias)
+    extreme_short: -0.05 # Alert when < -0.05% (extreme short bias)
+
+  volume_spike:
+    multiplier: 2.0      # Alert when volume > 2x average
+
+  oi_change:
+    threshold: 0.15      # Alert when OI changes > 15%
+
+# Data storage
+storage:
+  enabled: false         # Set to true to enable historical tracking
+  database: "data/perps.db"
+  retention_days: 90     # Keep data for 90 days
+
+# Display settings
+display:
+  currency_format: "USD"
+  decimal_places: 2
+  show_emoji: true       # Show emoji indicators in output
+
+# Logging
+logging:
+  level: "INFO"          # DEBUG, INFO, WARNING, ERROR
+  file: "crypto-perps.log"
+  console: true
+
+# Discord Integration
+discord:
+  enabled: true
+  webhook_url: "${DISCORD_WEBHOOK_URL}"  # Loaded from .env file
+  report_interval: 43200  # 12 hours in seconds (43200)
+  username: "Crypto Perps Bot"  # Bot name in Discord
+  avatar_url: ""  # Optional: custom avatar URL
+  mention_role: ""  # Optional: Discord role ID to mention (@everyone = "")
+  color_scheme:
+    bullish: 0x00FF00    # Green
+    bearish: 0xFF0000    # Red
+    neutral: 0xFFFFFF    # White
+    alert: 0xFFA500      # Orange
+  include_sections:
+    executive_summary: true
+    sentiment_analysis: true
+    arbitrage_opportunities: true
+    trading_patterns: true
+    recommendations: true
+    anomalies: true
