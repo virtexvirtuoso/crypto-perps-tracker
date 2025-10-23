@@ -305,13 +305,6 @@ MIT License - Feel free to use and modify
 
 ---
 
-## 🔗 Related Projects
-
-- **Virtuoso_ccxt** - Main trading system project
-- Located at: `/Users/ffv_macmini/Desktop/Virtuoso_ccxt`
-
----
-
 ## 📞 Support
 
 For issues or questions:
