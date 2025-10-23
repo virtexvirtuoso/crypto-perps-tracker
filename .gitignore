@@ -43,10 +43,9 @@ data/*.db
 data/*.sqlite
 data/*.sqlite3
 data/*.html
+data/*.txt
+data/*.png
 data/style-comparisons/
-
-# Documentation
-docs/
 
 # Logs
 *.log
