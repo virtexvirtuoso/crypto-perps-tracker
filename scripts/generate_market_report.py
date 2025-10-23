@@ -94,7 +94,7 @@ def generate_funding_rate_chart(results: List[Dict]) -> bytes:
                 colors.append('#FDB44B')  # Warm amber - neutral
 
     # Create chart
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     # Create bars with amber palette
     bars = ax.bar(exchanges, rates, color=colors, alpha=0.9, edgecolor='#FFA500', linewidth=2, zorder=2)
@@ -120,7 +120,7 @@ def generate_funding_rate_chart(results: List[Dict]) -> bytes:
     # Enhanced typography
     ax.set_xlabel('Exchange', fontsize=14, fontweight='bold', color='#FFD700', labelpad=10)
     ax.set_ylabel('Funding Rate (%)', fontsize=14, fontweight='bold', color='#FFD700', labelpad=10)
-    ax.set_title('⚡ BTC Funding Rates by Exchange', fontsize=16, fontweight='bold', pad=20, color='#FFA500')
+    ax.set_title('⚡ BTC Funding Rates by Exchange', fontsize=15, fontweight='bold', pad=20, color='#FFA500')
 
     # Reference line with amber accent
     ax.axhline(y=0, color='#FF8C00', linestyle='-', linewidth=1.5, alpha=0.6, zorder=1)
@@ -176,7 +176,7 @@ def generate_market_dominance_chart(dominance: Dict) -> bytes:
     ]
 
     # Create chart
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     wedges, texts, autotexts = ax.pie(
         shares,
@@ -209,7 +209,7 @@ def generate_market_dominance_chart(dominance: Dict) -> bytes:
         text.set_fontweight('bold')
         text.set_color('#FFD700')
 
-    ax.set_title('💎 Market Dominance by Exchange', fontsize=16, fontweight='bold', pad=20, color='#FFA500')
+    ax.set_title('💎 Market Dominance by Exchange', fontsize=15, fontweight='bold', pad=20, color='#FFA500')
 
     plt.tight_layout()
 
@@ -248,7 +248,7 @@ def generate_basis_chart(basis_data: List[Dict]) -> bytes:
             colors.append('#FDB44B')  # Warm amber (Neutral)
 
     # Create chart
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     # Create bars with amber styling
     bars = ax.bar(exchanges, basis_pcts, color=colors, alpha=0.9, edgecolor='#FFA500', linewidth=2)
@@ -274,7 +274,7 @@ def generate_basis_chart(basis_data: List[Dict]) -> bytes:
     # Amber typography
     ax.set_xlabel('Exchange', fontsize=14, fontweight='bold', labelpad=10)
     ax.set_ylabel('Basis (%)', fontsize=14, fontweight='bold', labelpad=10)
-    ax.set_title('📊 Spot-Futures Basis by Exchange', fontsize=16, fontweight='bold',
+    ax.set_title('📊 Spot-Futures Basis by Exchange', fontsize=15, fontweight='bold',
                  pad=20, color='#FFA500')
 
     # Amber reference lines
@@ -348,7 +348,7 @@ def generate_leverage_chart(basis_metrics: Dict) -> bytes:
         return None
 
     # Create chart
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 7))
 
     # Create bars with amber styling
     bars = ax.bar(exchanges, ratios, color=colors, alpha=0.9, edgecolor='#FFA500', linewidth=2)
@@ -379,7 +379,7 @@ def generate_leverage_chart(basis_metrics: Dict) -> bytes:
     ax.set_xlabel('Exchange', fontsize=14, fontweight='bold', labelpad=10)
     ax.set_ylabel('Futures/Spot Volume Ratio', fontsize=14, fontweight='bold', labelpad=10)
     ax.set_title('⚡ Leverage Activity by Exchange (Higher = More Speculation)',
-                 fontsize=16, fontweight='bold', pad=20, color='#FFA500')
+                 fontsize=15, fontweight='bold', pad=20, color='#FFA500')
 
     # Amber reference lines
     ax.axhline(y=1.0, color='#888888', linestyle='-', linewidth=1.5, alpha=0.8)
