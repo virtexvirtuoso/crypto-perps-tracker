@@ -22,6 +22,10 @@ from typing import Dict, List, Optional
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Chart generation
 import matplotlib
@@ -590,7 +594,7 @@ def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, 
 
     # Format x-axis
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
     fig.autofmt_xdate()
 
     # Grid and styling
@@ -1282,6 +1286,9 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     # Create figure
     fig, ax = plt.subplots(figsize=(16, 10))
 
+    # Collect label data for smart positioning
+    label_data = []
+
     # Plot each symbol
     for symbol, candles in historical_data.items():
         if not candles:
@@ -1302,13 +1309,50 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
         ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
                 alpha=alpha, label=symbol if symbol == 'BTC' else None)
 
-        # Add label at the end
+        # Collect label data
         if timestamps and percent_changes:
-            ax.text(timestamps[-1], percent_changes[-1], f'  {symbol}',
-                   va='center', ha='left', color=color, fontsize=10,
-                   fontweight='bold' if symbol == 'BTC' else 'normal',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
-                            edgecolor=color, alpha=0.8, linewidth=1))
+            label_data.append({
+                'x': timestamps[-1],
+                'y': percent_changes[-1],
+                'symbol': symbol,
+                'color': color,
+                'bold': symbol == 'BTC'
+            })
+
+    # Sort labels by y-position to enable smart spacing
+    label_data.sort(key=lambda d: d['y'])
+
+    # Add labels with overlap prevention
+    min_spacing = 2.5  # Minimum vertical spacing between labels in percentage points
+    texts = []
+
+    for i, data in enumerate(label_data):
+        # Adjust y-position if too close to previous label
+        adjusted_y = data['y']
+        if i > 0:
+            prev_y = label_data[i-1].get('adjusted_y', label_data[i-1]['y'])
+            if abs(adjusted_y - prev_y) < min_spacing:
+                # Space labels out
+                adjusted_y = prev_y + min_spacing if adjusted_y >= prev_y else prev_y - min_spacing
+
+        label_data[i]['adjusted_y'] = adjusted_y
+
+        # Create text label
+        text = ax.text(data['x'], adjusted_y, f"  {data['symbol']}",
+                      va='center', ha='left', color=data['color'], fontsize=10,
+                      fontweight='bold' if data['bold'] else 'normal',
+                      bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
+                               edgecolor=data['color'], alpha=0.8, linewidth=1))
+        texts.append(text)
+
+    # Try to use adjustText for even better positioning
+    try:
+        from adjustText import adjust_text
+        adjust_text(texts, ax=ax,
+                   only_move={'text': 'y'},  # Only adjust vertically
+                   arrowprops=dict(arrowstyle='-', color='#888888', lw=0.5, alpha=0.3))
+    except ImportError:
+        pass  # Use manual spacing only
 
     # Zero line
     ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
@@ -1321,7 +1365,7 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
 
     # Format x-axis
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
     fig.autofmt_xdate()
 
     # Grid and styling
@@ -1729,7 +1773,7 @@ if __name__ == "__main__":
     # Fetch historical data for top 25 symbols (including BTC)
     print("📈 Fetching historical price data for top 25 symbols...\n")
     top_symbols = ['BTC'] + [a['symbol'] for a in analyses[:24] if a['symbol'] != 'BTC']
-    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=24)
+    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=12)
     print(f"\n✅ Fetched historical data for {len(historical_data)} symbols\n")
 
     # Generate time-series chart
@@ -1772,15 +1816,13 @@ if __name__ == "__main__":
     # Send to Discord if configured
     try:
         with open('config/config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
+            content = f.read()
+            # Substitute environment variables
+            content = os.expandvars(content)
+            config = yaml.safe_load(content)
 
         discord_config = config.get('discord', {})
         webhook_url = discord_config.get('webhook_url')
-
-        # Expand environment variables in webhook URL
-        if webhook_url and webhook_url.startswith('${') and webhook_url.endswith('}'):
-            env_var = webhook_url[2:-1]  # Extract variable name
-            webhook_url = os.getenv(env_var)
 
         if webhook_url and discord_config.get('enabled', False):
             print(f"\n📤 Sending to Discord webhook...")
