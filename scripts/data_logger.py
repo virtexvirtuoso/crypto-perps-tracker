@@ -220,7 +220,7 @@ def log_market_snapshot() -> bool:
             factors['long_short_bias']['score'],
             factors['conviction']['score'],
             factors['divergence']['score'],
-            factors['oi_price']['score']
+            factors['oi_price_correlation']['score']
         ))
 
         # 4. Try to log liquidations (if available)
