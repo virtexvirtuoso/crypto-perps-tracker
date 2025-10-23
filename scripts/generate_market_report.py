@@ -1138,19 +1138,19 @@ def format_market_report(results: List[Dict]) -> str:
 
     # Header
     output.append("\n")
-    output.append("="*100)
-    output.append("█"*100)
-    output.append(f"{'CRYPTO PERPETUAL FUTURES MARKET REPORT':^100}")
-    output.append(f"{'Generated: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'):^100}")
-    output.append(f"{'Powered by Virtuoso Crypto [virtuosocrypto.com]':^100}")
-    output.append("█"*100)
-    output.append("="*100)
+    output.append("="*150)
+    
+    output.append(f"{'CRYPTO PERPETUAL FUTURES MARKET REPORT':^150}")
+    output.append(f"{'Cross-Exchange Analysis • Generated: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'):^150}")
+    output.append(f"{'Powered by Virtuoso Crypto [virtuosocrypto.com]':^150}")
+    
+    output.append("="*150)
     output.append("")
 
     # Executive Summary - Enhanced for Traders
     output.append("\n" + "="*100)
     output.append("📊 EXECUTIVE SUMMARY")
-    output.append("="*100)
+    output.append("="*150)
 
     # Core Market Data
     output.append(f"Total Daily Volume:        ${total_volume/1e9:>8.2f}B across {len(successful)} exchanges")
@@ -1158,9 +1158,9 @@ def format_market_report(results: List[Dict]) -> str:
     output.append(f"Markets Tracked:           {total_markets:>8,} trading pairs")
 
     # Market Sentiment (Enhanced)
-    output.append(f"\n{'─'*100}")
+    output.append(f"\n{'─'*150}")
     output.append("🎯 MARKET SENTIMENT & POSITIONING")
-    output.append(f"{'─'*100}")
+    output.append(f"{'─'*150}")
     output.append(f"Overall Direction:         {sentiment['sentiment']} ({sentiment['strength']} Signal, Score: {sentiment['composite_score']:.3f})")
     output.append(f"Price Momentum (24h):      {sentiment['avg_price_change']:>7.2f}%")
 
@@ -1173,9 +1173,9 @@ def format_market_report(results: List[Dict]) -> str:
         output.append(f"Trader Positioning:        {ls_emoji} {ls_long_pct*100:.1f}% Long / {(1-ls_long_pct)*100:.1f}% Short (Contrarian: {contrarian_signal})")
 
     # Funding Rate Summary
-    output.append(f"\n{'─'*100}")
+    output.append(f"\n{'─'*150}")
     output.append("💰 FUNDING RATE ENVIRONMENT")
-    output.append(f"{'─'*100}")
+    output.append(f"{'─'*150}")
     output.append(f"Weighted Avg Funding:      {sentiment['weighted_funding']:>7.4f}% per 8h ({sentiment['weighted_funding']*3*365:.2f}% annual)")
 
     # Funding extremes
@@ -1200,9 +1200,9 @@ def format_market_report(results: List[Dict]) -> str:
     # Market Structure (Spot-Futures)
     high_leverage_count = 0  # Initialize for risk assessment later
     if basis_metrics.get('status') == 'success':
-        output.append(f"\n{'─'*100}")
+        output.append(f"\n{'─'*150}")
         output.append("📈 MARKET STRUCTURE (SPOT vs FUTURES)")
-        output.append(f"{'─'*100}")
+        output.append(f"{'─'*150}")
         output.append(f"Basis Environment:         {basis_metrics['structure_signal']} {basis_metrics['market_structure']}")
         output.append(f"Average Basis:             {basis_metrics['avg_basis']:>7.4f}% ({basis_metrics['interpretation']})")
 
@@ -1223,9 +1223,9 @@ def format_market_report(results: List[Dict]) -> str:
         output.append(f"\n{conviction_msg}")
 
     # Opportunities & Alerts
-    output.append(f"\n{'─'*100}")
+    output.append(f"\n{'─'*150}")
     output.append("🔔 OPPORTUNITIES & ALERTS")
-    output.append(f"{'─'*100}")
+    output.append(f"{'─'*150}")
 
     # Arbitrage opportunities
     arb_count = len(arb_opportunities) if arb_opportunities else 0
@@ -1244,9 +1244,9 @@ def format_market_report(results: List[Dict]) -> str:
         output.append(f"✅ Market Health:           No anomalies detected")
 
     # Quick Action Summary
-    output.append(f"\n{'─'*100}")
+    output.append(f"\n{'─'*150}")
     output.append("⚡ QUICK ACTION SUMMARY")
-    output.append(f"{'─'*100}")
+    output.append(f"{'─'*150}")
 
     # Direction bias
     if sentiment['sentiment'] == "🟢 BULLISH":
@@ -1277,7 +1277,7 @@ def format_market_report(results: List[Dict]) -> str:
     # Market Sentiment Analysis
     output.append("\n" + "="*100)
     output.append("💭 ENHANCED MULTI-FACTOR SENTIMENT ANALYSIS")
-    output.append("="*100)
+    output.append("="*150)
     output.append(f"Overall Sentiment: {sentiment['sentiment']} ({sentiment['strength']} Signal)")
     output.append(f"Composite Score:   {sentiment['composite_score']:.3f} (Range: -1.0 to +1.0)")
     output.append(f"Interpretation:    {sentiment['interpretation']}\n")
@@ -1285,7 +1285,7 @@ def format_market_report(results: List[Dict]) -> str:
     # Multi-factor breakdown
     output.append("📊 Sentiment Factor Breakdown:")
     output.append(f"{'Factor':<25} {'Signal':<20} {'Score':<10} {'Weight':<10} {'Value'}")
-    output.append("-"*100)
+    output.append("-"*150)
 
     factors = sentiment['factors']
     output.append(
@@ -1339,7 +1339,7 @@ def format_market_report(results: List[Dict]) -> str:
 
     output.append("\n📈 Funding Rates by Exchange (BTC):")
     output.append(f"{'Exchange':<15} {'Funding Rate':>12} {'Volume Weight':>12} {'Annual Cost/Yield'}")
-    output.append("-"*100)
+    output.append("-"*150)
     for fe in sentiment['funding_exchanges']:
         annual = fe['rate'] * 3 * 365  # 3 funding periods per day
         output.append(
@@ -1351,7 +1351,7 @@ def format_market_report(results: List[Dict]) -> str:
     if basis_metrics.get('status') == 'success':
         output.append("\n" + "="*100)
         output.append("💱 SPOT-FUTURES BASIS ANALYSIS (CONTANGO/BACKWARDATION)")
-        output.append("="*100)
+        output.append("="*150)
         output.append(f"Market Structure:     {basis_metrics['structure_signal']} {basis_metrics['market_structure']}")
         output.append(f"Average Basis:        {basis_metrics['avg_basis']:>7.4f}%")
         output.append(f"Basis Range:          {basis_metrics['min_basis']:>7.4f}% to {basis_metrics['max_basis']:>7.4f}%")
@@ -1361,7 +1361,7 @@ def format_market_report(results: List[Dict]) -> str:
         # Basis details by exchange
         output.append("\n📊 Basis Breakdown by Exchange:")
         output.append(f"{'Exchange':<15} {'Spot Price':>12} {'Futures Price':>14} {'Basis ($)':>10} {'Basis (%)':>10}")
-        output.append("-"*100)
+        output.append("-"*150)
         for bd in basis_metrics['basis_data']:
             output.append(
                 f"{bd['exchange']:<15} ${bd['spot_price']:>11,.2f} ${bd['futures_price']:>13,.2f} "
@@ -1372,7 +1372,7 @@ def format_market_report(results: List[Dict]) -> str:
         if basis_metrics['volume_analysis']:
             output.append("\n📈 Spot vs Futures Volume Ratio:")
             output.append(f"{'Exchange':<15} {'Ratio':>10} {'Signal':<20} {'Interpretation'}")
-            output.append("-"*100)
+            output.append("-"*150)
             for va in basis_metrics['volume_analysis']:
                 output.append(
                     f"{va['exchange']:<15} {va['ratio']:>9.2f}x {va['signal']:<20} {va['meaning']}"
@@ -1399,7 +1399,7 @@ def format_market_report(results: List[Dict]) -> str:
     # Market Dominance
     output.append("\n" + "="*100)
     output.append("🏆 MARKET DOMINANCE & CONCENTRATION")
-    output.append("="*100)
+    output.append("="*150)
     output.append(f"Top 3 Concentration:    {dominance['top3_concentration']:.1f}% (HHI: {dominance['hhi']:.0f} - {dominance['concentration_level']})")
     output.append(f"CEX Dominance:          {dominance['cex_dominance']:.1f}%")
     output.append(f"DEX Market Share:       {dominance['dex_share']:.1f}%\n")
@@ -1411,7 +1411,7 @@ def format_market_report(results: List[Dict]) -> str:
     # Trading Behavior
     output.append("\n" + "="*100)
     output.append("📈 TRADING BEHAVIOR PATTERNS")
-    output.append("="*100)
+    output.append("="*150)
 
     if trading_behavior['day_trading_heavy']:
         output.append(f"Day-Trading Heavy (<0.3x OI/Vol):    {', '.join(trading_behavior['day_trading_heavy'])}")
@@ -1428,7 +1428,7 @@ def format_market_report(results: List[Dict]) -> str:
     if arb_opportunities:
         output.append("\n" + "="*100)
         output.append("💰 ARBITRAGE OPPORTUNITIES")
-        output.append("="*100)
+        output.append("="*150)
         output.append(f"Found {len(arb_opportunities)} potential opportunities:\n")
 
         for i, opp in enumerate(arb_opportunities[:5], 1):  # Top 5
@@ -1443,7 +1443,7 @@ def format_market_report(results: List[Dict]) -> str:
     if anomalies:
         output.append("\n" + "="*100)
         output.append("⚠️  MARKET HEALTH & ANOMALIES")
-        output.append("="*100)
+        output.append("="*150)
         for anomaly in anomalies:
             output.append(f"[{anomaly['severity']}] {anomaly['exchange']}: {anomaly['type']}")
             output.append(f"         {anomaly['indicator']}\n")
@@ -1451,14 +1451,14 @@ def format_market_report(results: List[Dict]) -> str:
     # Recommendations
     output.append("\n" + "="*100)
     output.append("🎯 TRADING RECOMMENDATIONS")
-    output.append("="*100)
+    output.append("="*150)
     for i, rec in enumerate(recommendations, 1):
         output.append(f"{i}. {rec}")
 
     # Risk Warnings
     output.append("\n" + "="*100)
     output.append("⚠️  RISK DISCLOSURE")
-    output.append("="*100)
+    output.append("="*150)
     output.append("• Perpetual futures trading involves significant risk of loss")
     output.append("• Funding rates can change rapidly; past rates don't guarantee future rates")
     output.append("• High leverage amplifies both gains and losses")
@@ -1468,13 +1468,13 @@ def format_market_report(results: List[Dict]) -> str:
     # Footer
     output.append("\n" + "="*100)
     output.append("📝 REPORT METADATA")
-    output.append("="*100)
+    output.append("="*150)
     output.append(f"Data Sources: {len(successful)} exchanges (Binance, OKX, Bybit, Gate.io, Bitget, Coinbase INTX, HyperLiquid, AsterDEX, dYdX)")
     output.append(f"OI Coverage: 8/9 exchanges (88.9% coverage)")
     output.append(f"Spot-Futures Analysis: {basis_metrics.get('exchanges_analyzed', 0)}/6 exchanges (Binance, Bybit, OKX, Gate.io, Coinbase, Kraken)")
     output.append(f"Report Version: 2.2 (6-Exchange Spot-Futures + Institutional Insight)")
     output.append(f"Generated: {datetime.now(timezone.utc).isoformat()}")
-    output.append("="*100 + "\n")
+    output.append("="*150 + "\n")
 
     return "\n".join(output)
 
