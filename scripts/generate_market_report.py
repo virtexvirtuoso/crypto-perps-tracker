@@ -130,12 +130,16 @@ def generate_funding_rate_chart(results: List[Dict]) -> bytes:
     ax.tick_params(axis='x', colors='#FFD700', labelsize=11)
     ax.tick_params(axis='y', colors='#FFD700', labelsize=11)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
@@ -211,11 +215,15 @@ def generate_market_dominance_chart(dominance: Dict) -> bytes:
 
     ax.set_title('💎 Market Dominance by Exchange', fontsize=15, fontweight='bold', pad=20, color='#FFA500')
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     plt.tight_layout()
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
@@ -291,12 +299,16 @@ def generate_basis_chart(basis_data: List[Dict]) -> bytes:
     ax.tick_params(axis='x', colors='#FFD700', labelsize=11)
     ax.tick_params(axis='y', colors='#FFD700', labelsize=11)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
@@ -395,12 +407,16 @@ def generate_leverage_chart(basis_metrics: Dict) -> bytes:
     ax.tick_params(axis='x', colors='#FFD700', labelsize=11)
     ax.tick_params(axis='y', colors='#FFD700', labelsize=11)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
