@@ -15,15 +15,19 @@ For each symbol (e.g., BTC, ETH, SOL), provides:
 import requests
 import json
 import io
+import yaml
+import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 # Chart generation
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
@@ -451,6 +455,179 @@ def fetch_coinbase_symbols() -> List[Dict]:
         return []
 
 
+def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 24) -> Dict[str, List[Dict]]:
+    """
+    Fetch hourly historical OHLCV data for specified symbols from OKX
+
+    Args:
+        symbols: List of symbol names (e.g., ['BTC', 'ETH', 'SOL'])
+        limit: Number of hourly candles to fetch (default 24 for 24 hours)
+
+    Returns:
+        Dict mapping symbol -> list of {timestamp, open, high, low, close, volume}
+    """
+    historical_data = {}
+
+    print(f"   📊 Fetching {limit}h historical data for {len(symbols)} symbols...")
+
+    for symbol in symbols:
+        try:
+            # OKX uses -USDT-SWAP pairs
+            okx_symbol = f"{symbol}-USDT-SWAP"
+
+            url = "https://www.okx.com/api/v5/market/candles"
+            params = {
+                'instId': okx_symbol,
+                'bar': '1H',
+                'limit': limit
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get('code') == '0' and data.get('data'):
+                    klines = data['data']
+
+                    # Parse klines data (OKX format: [ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm])
+                    candles = []
+                    for k in reversed(klines):  # OKX returns newest first, reverse to get oldest first
+                        candles.append({
+                            'timestamp': int(k[0]),  # Timestamp in ms
+                            'open': float(k[1]),
+                            'high': float(k[2]),
+                            'low': float(k[3]),
+                            'close': float(k[4]),
+                            'volume': float(k[5])
+                        })
+
+                    historical_data[symbol] = candles
+                    print(f"      ✓ {symbol}: {len(candles)} candles")
+                else:
+                    print(f"      ⚠️  {symbol}: API returned error")
+            else:
+                print(f"      ⚠️  {symbol}: Failed to fetch (status {response.status_code})")
+
+            # Rate limiting
+            time.sleep(0.15)
+
+        except Exception as e:
+            print(f"      ❌ {symbol}: {e}")
+
+    return historical_data
+
+
+def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, List[Dict]], filename: str) -> bool:
+    """Generate time-series chart showing individual symbol movements vs Bitcoin"""
+
+    # Apply style
+    try:
+        import mplcyberpunk
+        plt.style.use("cyberpunk")
+    except ImportError:
+        plt.style.use('dark_background')
+
+    if not historical_data:
+        print("      ⚠️  No historical data available for chart")
+        return False
+
+    # Helper function to get color based on beta
+    def get_beta_color(beta):
+        if beta > 1.5:
+            return '#FF6B35'
+        elif beta > 1.0:
+            return '#FFA500'
+        elif beta > 0.5:
+            return '#FDB44B'
+        elif beta > 0:
+            return '#FFD700'
+        else:
+            return '#00FF7F'
+
+    # Create beta lookup
+    beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(16, 10))
+
+    # Plot each symbol
+    for symbol, candles in historical_data.items():
+        if not candles:
+            continue
+
+        # Normalize to percentage change from first candle
+        initial_price = candles[0]['close']
+        timestamps = [datetime.fromtimestamp(c['timestamp'] / 1000) for c in candles]
+        percent_changes = [((c['close'] - initial_price) / initial_price) * 100 for c in candles]
+
+        # Get beta and color
+        beta = beta_lookup.get(symbol, 1.0)
+        color = get_beta_color(beta)
+        linewidth = 4 if symbol == 'BTC' else 2
+        alpha = 1.0 if symbol == 'BTC' else 0.7
+
+        # Plot line
+        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
+                alpha=alpha, label=symbol if symbol == 'BTC' else None)
+
+        # Add label at the end
+        if timestamps and percent_changes:
+            ax.text(timestamps[-1], percent_changes[-1], f'  {symbol}',
+                   va='center', ha='left', color=color, fontsize=10,
+                   fontweight='bold' if symbol == 'BTC' else 'normal',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
+                            edgecolor=color, alpha=0.8, linewidth=1))
+
+    # Zero line
+    ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
+
+    # Formatting
+    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
+                fontsize=18, fontweight='bold', color='#FFA500', pad=20)
+
+    # Format x-axis
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    fig.autofmt_xdate()
+
+    # Grid and styling
+    ax.grid(alpha=0.2, color='#FFD700', linewidth=0.8)
+    ax.tick_params(colors='#FFD700', labelsize=11)
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
+    # Legend
+    if ax.get_legend_handles_labels()[0]:
+        legend = ax.legend(fontsize=12, framealpha=0.9, loc='upper left')
+        plt.setp(legend.get_texts(), color='#FFD700')
+        legend.get_frame().set_facecolor('#1a1a1a')
+        legend.get_frame().set_edgecolor('#FFA500')
+        legend.get_frame().set_linewidth(2)
+
+    # Add glow effects if available
+    try:
+        import mplcyberpunk
+        mplcyberpunk.add_glow_effects(ax=ax)
+    except (ImportError, TypeError):
+        pass
+
+    # Save to file
+    try:
+        plt.tight_layout()
+        plt.savefig(filename, dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
+        plt.close()
+        plt.style.use('default')
+        return True
+    except Exception as e:
+        print(f"      ❌ Error saving chart: {e}")
+        plt.close()
+        plt.style.use('default')
+        return False
+
+
 def analyze_symbol(symbol: str, exchange_data: List[Dict], btc_price_change: float = None) -> Dict:
     """
     Analyze a single symbol across all exchanges
@@ -643,6 +820,7 @@ def format_symbol_report(symbol_data: Dict[str, List[Dict]], top_n: int = 20) ->
     output.append("\n" + "="*150)
     output.append(f"{'SYMBOL-BY-SYMBOL MARKET REPORT':^150}")
     output.append(f"{'Cross-Exchange Analysis • Generated: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'):^150}")
+    output.append(f"{'Powered by Virtuoso Crypto [virtuosocrypto.com]':^150}")
     output.append("="*150)
 
     # Executive summary
@@ -718,6 +896,8 @@ def format_symbol_report(symbol_data: Dict[str, List[Dict]], top_n: int = 20) ->
     output.append("\n" + "="*150)
     output.append("₿ BITCOIN BETA ANALYSIS (Correlation to BTC Moves)")
     output.append("="*150)
+    output.append("📊 Time-Series Chart: See bitcoin_beta_chart_[timestamp].png for visual representation")
+    output.append("")
 
     symbols_with_beta = [a for a in analyses if a.get('btc_beta') is not None and a['symbol'] != 'BTC']
 
@@ -1058,8 +1238,127 @@ def generate_arbitrage_opportunities_chart(analyses: List[Dict], top_n: int = 12
     return chart_bytes
 
 
+def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data: Dict[str, List[Dict]]) -> bytes:
+    """Generate time-series chart showing individual symbol movements vs Bitcoin"""
+
+    # Apply style
+    try:
+        import mplcyberpunk
+        plt.style.use("cyberpunk")
+    except ImportError:
+        plt.style.use('dark_background')
+
+    if not historical_data:
+        # Return empty chart if no data
+        fig, ax = plt.subplots(figsize=(16, 10))
+        ax.text(0.5, 0.5, 'No Historical Data Available', ha='center', va='center', fontsize=24, color='#FFA500')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
+        buf.seek(0)
+        chart_bytes = buf.getvalue()
+        plt.close()
+        plt.style.use('default')
+        return chart_bytes
+
+    # Helper function to get color based on beta
+    def get_beta_color(beta):
+        if beta > 1.5:
+            return '#FF6B35'
+        elif beta > 1.0:
+            return '#FFA500'
+        elif beta > 0.5:
+            return '#FDB44B'
+        elif beta > 0:
+            return '#FFD700'
+        else:
+            return '#00FF7F'
+
+    # Create beta lookup
+    beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(16, 10))
+
+    # Plot each symbol
+    for symbol, candles in historical_data.items():
+        if not candles:
+            continue
+
+        # Normalize to percentage change from first candle
+        initial_price = candles[0]['close']
+        timestamps = [datetime.fromtimestamp(c['timestamp'] / 1000) for c in candles]
+        percent_changes = [((c['close'] - initial_price) / initial_price) * 100 for c in candles]
+
+        # Get beta and color
+        beta = beta_lookup.get(symbol, 1.0)
+        color = get_beta_color(beta)
+        linewidth = 4 if symbol == 'BTC' else 2
+        alpha = 1.0 if symbol == 'BTC' else 0.7
+
+        # Plot line
+        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
+                alpha=alpha, label=symbol if symbol == 'BTC' else None)
+
+        # Add label at the end
+        if timestamps and percent_changes:
+            ax.text(timestamps[-1], percent_changes[-1], f'  {symbol}',
+                   va='center', ha='left', color=color, fontsize=10,
+                   fontweight='bold' if symbol == 'BTC' else 'normal',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
+                            edgecolor=color, alpha=0.8, linewidth=1))
+
+    # Zero line
+    ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
+
+    # Formatting
+    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
+                fontsize=18, fontweight='bold', color='#FFA500', pad=20)
+
+    # Format x-axis
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    fig.autofmt_xdate()
+
+    # Grid and styling
+    ax.grid(alpha=0.2, color='#FFD700', linewidth=0.8)
+    ax.tick_params(colors='#FFD700', labelsize=11)
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
+    # Legend
+    if ax.get_legend_handles_labels()[0]:
+        legend = ax.legend(fontsize=12, framealpha=0.9, loc='upper left')
+        plt.setp(legend.get_texts(), color='#FFD700')
+        legend.get_frame().set_facecolor('#1a1a1a')
+        legend.get_frame().set_edgecolor('#FFA500')
+        legend.get_frame().set_linewidth(2)
+
+    # Add glow effects if available
+    try:
+        import mplcyberpunk
+        mplcyberpunk.add_glow_effects(ax=ax)
+    except (ImportError, TypeError):
+        pass
+
+    # Save to bytes
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
+    buf.seek(0)
+    chart_bytes = buf.getvalue()
+    plt.close()
+    plt.style.use('default')
+
+    return chart_bytes
+
+
 def generate_bitcoin_beta_chart(analyses: List[Dict], top_n: int = 15) -> bytes:
-    """Generate Beta Champions chart showing top symbols by beta category"""
+    """Generate Beta Champions chart showing top symbols by beta category (DEPRECATED - use timeseries version)"""
 
     # Apply cyberpunk style
     try:
@@ -1202,7 +1501,7 @@ def generate_bitcoin_beta_chart(analyses: List[Dict], top_n: int = 15) -> bytes:
     return chart_bytes
 
 
-def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], webhook_url: str) -> bool:
+def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], historical_data: Dict[str, List[Dict]], webhook_url: str) -> bool:
     """Send symbol report to Discord as summary embed + file attachment"""
 
     try:
@@ -1330,7 +1629,7 @@ def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], webhoo
             print(f"      ⚠️  Could not generate arbitrage chart: {e}")
 
         try:
-            beta_chart = generate_bitcoin_beta_chart(analyses, top_n=20)
+            beta_chart = generate_bitcoin_beta_chart_timeseries(analyses, historical_data)
             print("      ✓ Bitcoin Beta chart generated")
         except Exception as e:
             print(f"      ⚠️  Could not generate Bitcoin Beta chart: {e}")
@@ -1427,25 +1726,68 @@ if __name__ == "__main__":
     # Sort by volume
     analyses.sort(key=lambda x: x['total_volume_24h'], reverse=True)
 
+    # Fetch historical data for top 25 symbols (including BTC)
+    print("📈 Fetching historical price data for top 25 symbols...\n")
+    top_symbols = ['BTC'] + [a['symbol'] for a in analyses[:24] if a['symbol'] != 'BTC']
+    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=24)
+    print(f"\n✅ Fetched historical data for {len(historical_data)} symbols\n")
+
+    # Generate time-series chart
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+
+    # Get project root directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    data_dir = os.path.join(project_root, 'data')
+    os.makedirs(data_dir, exist_ok=True)
+
+    chart_filename = os.path.join(data_dir, f"bitcoin_beta_chart_{timestamp}.png")
+
+    print("🎨 Generating Bitcoin Beta time-series chart...")
+    if generate_time_series_chart(analyses, historical_data, chart_filename):
+        print(f"   ✓ Chart saved to: {chart_filename}\n")
+    else:
+        print(f"   ⚠️  Chart generation failed\n")
+
     # Generate report
     report = format_symbol_report(symbol_data, top_n=20)
+
+    # Update chart filename in report
+    chart_basename = os.path.basename(chart_filename)
+    report = report.replace("bitcoin_beta_chart_[timestamp].png", chart_basename)
 
     # Display
     print(report)
 
     # Save to file
-    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-    filename = f"data/symbol_report_{timestamp}.txt"
+    txt_filename = os.path.join(data_dir, f"symbol_report_{timestamp}.txt")
 
     try:
-        with open(filename, 'w') as f:
+        with open(txt_filename, 'w') as f:
             f.write(report)
-        print(f"✅ Report saved to: {filename}")
+        print(f"✅ Report saved to: {txt_filename}")
     except Exception as e:
         print(f"⚠️  Could not save report: {e}")
 
-    # Send to Discord webhook
-    webhook_url = "https://discord.com/api/webhooks/1430641654846459964/QQj9KDof3UNhDj-p3GyrVDDAX1rWjja6D8VfQ92wSaxdsqEot8VD2S_W8J9uQdLT-oR7"
+    # Send to Discord if configured
+    try:
+        with open('config/config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
 
-    print(f"\n📤 Sending to Discord webhook...")
-    send_symbol_report_to_discord(report, analyses, webhook_url)
+        discord_config = config.get('discord', {})
+        webhook_url = discord_config.get('webhook_url')
+
+        # Expand environment variables in webhook URL
+        if webhook_url and webhook_url.startswith('${') and webhook_url.endswith('}'):
+            env_var = webhook_url[2:-1]  # Extract variable name
+            webhook_url = os.getenv(env_var)
+
+        if webhook_url and discord_config.get('enabled', False):
+            print(f"\n📤 Sending to Discord webhook...")
+            send_symbol_report_to_discord(report, analyses, historical_data, webhook_url)
+        else:
+            print("\n⚠️  Discord integration not enabled in config/config.yaml")
+    except FileNotFoundError:
+        print("\n⚠️  Config file not found: config/config.yaml")
+    except Exception as e:
+        print(f"\n⚠️  Could not load Discord config: {e}")

@@ -1474,7 +1474,6 @@ def format_market_report(results: List[Dict]) -> str:
     output.append(f"Spot-Futures Analysis: {basis_metrics.get('exchanges_analyzed', 0)}/6 exchanges (Binance, Bybit, OKX, Gate.io, Coinbase, Kraken)")
     output.append(f"Report Version: 2.2 (6-Exchange Spot-Futures + Institutional Insight)")
     output.append(f"Generated: {datetime.now(timezone.utc).isoformat()}")
-    output.append(f"Powered by: Virtuoso Crypto | virtuosocrypto.com")
     output.append("="*100 + "\n")
 
     return "\n".join(output)
