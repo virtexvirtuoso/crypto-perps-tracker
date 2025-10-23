@@ -1322,10 +1322,10 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
 
     # Formatting
-    ax.set_xlabel('Time (12h Period)', fontsize=14, fontweight='bold', color='#FFD700')
-    ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_xlabel('Time (12h Period)', fontsize=9, fontweight='bold', color='#FFD700')
+    ax.set_ylabel('Price Change (%)', fontsize=9, fontweight='bold', color='#FFD700')
     ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (12h)',
-                fontsize=18, fontweight='bold', color='#FFA500', pad=20)
+                fontsize=12, fontweight='bold', color='#FFA500', pad=20)
 
     # Format x-axis
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
@@ -1333,7 +1333,7 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
     fig.autofmt_xdate()
 
     # Styling (no grid)
-    ax.tick_params(colors='#FFD700', labelsize=11)
+    ax.tick_params(colors='#FFD700', labelsize=7)
     ax.set_facecolor('#0a0a0a')
     fig.patch.set_facecolor('#0a0a0a')
 
@@ -1346,7 +1346,7 @@ def generate_bitcoin_beta_chart_timeseries(analyses: List[Dict], historical_data
 
     # Add legend on the right side
     legend = ax.legend(handles, labels,
-                      fontsize=10,
+                      fontsize=7,
                       framealpha=0.9,
                       loc='center left',
                       bbox_to_anchor=(1.01, 0.5),
