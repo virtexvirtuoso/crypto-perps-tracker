@@ -5,10 +5,15 @@ Sends formatted market reports to Discord webhook
 """
 
 import sys
+import os
 import requests
 from datetime import datetime
 from typing import Dict, List
 import yaml
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import market analysis functions
 from generate_market_report import (
@@ -22,10 +27,13 @@ from generate_market_report import (
 
 
 def load_config() -> Dict:
-    """Load configuration from YAML file"""
+    """Load configuration from YAML file with environment variable substitution"""
     try:
         with open('config/config.yaml', 'r') as f:
-            return yaml.safe_load(f)
+            content = f.read()
+            # Substitute environment variables
+            content = os.path.expandvars(content)
+            return yaml.safe_load(content)
     except FileNotFoundError:
         print("⚠️  Config file not found. Using default settings.")
         return {

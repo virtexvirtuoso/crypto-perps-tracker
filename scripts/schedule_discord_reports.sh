@@ -23,9 +23,16 @@ send_reports() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Discord reports generation" >> "$LOG_FILE"
     echo "===========================================================================" >> "$LOG_FILE"
 
+    # Use venv python if available, otherwise system python3
+    if [ -f "$PROJECT_DIR/venv/bin/python3" ]; then
+        PYTHON="$PROJECT_DIR/venv/bin/python3"
+    else
+        PYTHON="python3"
+    fi
+
     # Run the Market Report
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Generating Market Report..." >> "$LOG_FILE"
-    python3 scripts/send_discord_report.py >> "$LOG_FILE" 2>&1
+    $PYTHON scripts/send_discord_report.py >> "$LOG_FILE" 2>&1
     MARKET_STATUS=$?
 
     if [ $MARKET_STATUS -eq 0 ]; then
@@ -38,7 +45,7 @@ send_reports() {
 
     # Run the Symbol Report
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Generating Symbol Report..." >> "$LOG_FILE"
-    python3 scripts/generate_symbol_report.py >> "$LOG_FILE" 2>&1
+    $PYTHON scripts/generate_symbol_report.py >> "$LOG_FILE" 2>&1
     SYMBOL_STATUS=$?
 
     if [ $SYMBOL_STATUS -eq 0 ]; then
