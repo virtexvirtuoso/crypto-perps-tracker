@@ -1061,6 +1061,10 @@ def generate_top_symbols_volume_chart(analyses: List[Dict], top_n: int = 15) -> 
     ax.grid(axis='x', alpha=0.2, color='#FFD700', linewidth=0.5)
     ax.tick_params(axis='both', colors='#FFD700', labelsize=10)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     # Invert y-axis so #1 is at top
     ax.invert_yaxis()
 
@@ -1068,7 +1072,7 @@ def generate_top_symbols_volume_chart(analyses: List[Dict], top_n: int = 15) -> 
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
@@ -1141,6 +1145,10 @@ def generate_funding_comparison_chart(analyses: List[Dict], top_n: int = 15) -> 
     ax.grid(axis='x', alpha=0.2, color='#FFD700', linewidth=0.5)
     ax.tick_params(axis='both', colors='#FFD700', labelsize=10)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     # Invert y-axis
     ax.invert_yaxis()
 
@@ -1148,7 +1156,7 @@ def generate_funding_comparison_chart(analyses: List[Dict], top_n: int = 15) -> 
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
@@ -1226,6 +1234,10 @@ def generate_arbitrage_opportunities_chart(analyses: List[Dict], top_n: int = 12
     ax.grid(axis='x', alpha=0.2, color='#FFD700', linewidth=0.5)
     ax.tick_params(axis='both', colors='#FFD700', labelsize=10)
 
+    # Dark background styling
+    ax.set_facecolor('#0a0a0a')
+    fig.patch.set_facecolor('#0a0a0a')
+
     # Invert y-axis
     ax.invert_yaxis()
 
@@ -1233,7 +1245,7 @@ def generate_arbitrage_opportunities_chart(analyses: List[Dict], top_n: int = 12
 
     # Save to bytes
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', facecolor='#0a0a0a')
     buf.seek(0)
     chart_bytes = buf.getvalue()
     plt.close()
