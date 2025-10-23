@@ -1,0 +1,183 @@
+#!/bin/bash
+# Crypto Perps Tracker Quick Control Script
+
+PROJECT_DIR="${PROJECT_DIR:-$HOME/crypto-perps-tracker}"
+VENV="$PROJECT_DIR/venv/bin/python3"
+DB="$PROJECT_DIR/data/market_history.db"
+LOG="$PROJECT_DIR/logs/data_logger.log"
+
+case "$1" in
+    snapshot|s)
+        echo "📊 Logging market snapshot..."
+        cd "$PROJECT_DIR"
+        $VENV scripts/data_logger.py
+        ;;
+    stats|st)
+        cd "$PROJECT_DIR"
+        $VENV scripts/data_logger.py --stats
+        ;;
+    log|l)
+        tail -f "$LOG"
+        ;;
+    logs)
+        tail -n "${2:-50}" "$LOG"
+        ;;
+    db)
+        if [ -f "$DB" ]; then
+            du -h "$DB"
+            sqlite3 "$DB" "SELECT COUNT(*) as snapshots FROM market_snapshots" 2>/dev/null || echo "Use: ct stats"
+        else
+            echo "Database not found: $DB"
+        fi
+        ;;
+    query|q)
+        if [ -z "$2" ]; then
+            echo "Usage: ct query \"SELECT * FROM market_snapshots LIMIT 5\""
+        else
+            cd "$PROJECT_DIR"
+            sqlite3 "$DB" "$2"
+        fi
+        ;;
+    liquidations|liq)
+        cd "$PROJECT_DIR"
+        $VENV scripts/fetch_liquidations.py --hours "${2:-1}"
+        ;;
+    cleanup|clean)
+        DAYS="${2:-90}"
+        echo "🗑️  Cleaning data older than $DAYS days..."
+        cd "$PROJECT_DIR"
+        $VENV scripts/data_logger.py --cleanup "$DAYS"
+        ;;
+    init)
+        echo "🔧 Initializing database..."
+        cd "$PROJECT_DIR"
+        $VENV scripts/data_logger.py --init
+        ;;
+    cron)
+        echo "📅 Crontab entries:"
+        crontab -l | grep -A1 "Crypto Perps" || echo "No cron jobs found"
+        ;;
+    tail|t)
+        tail -n "${2:-20}" "$LOG"
+        ;;
+    recent|r)
+        cd "$PROJECT_DIR"
+        echo "📈 Recent snapshots (last ${2:-5}):"
+        sqlite3 "$DB" << EOF
+SELECT
+    datetime(timestamp, 'unixepoch') as time,
+    printf('%.3f', composite_score) as score,
+    sentiment,
+    printf('\$%.1fB', total_volume/1e9) as volume,
+    printf('\$%.1fB', total_oi/1e9) as oi
+FROM market_snapshots
+ORDER BY timestamp DESC
+LIMIT ${2:-5};
+EOF
+        ;;
+    trends|tr)
+        cd "$PROJECT_DIR"
+        HOURS="${2:-24}"
+        echo "📊 Sentiment trends (last $HOURS hours):"
+        sqlite3 "$DB" << EOF
+SELECT
+    sentiment,
+    COUNT(*) as count,
+    printf('%.1f%%', COUNT(*) * 100.0 / (SELECT COUNT(*) FROM market_snapshots WHERE timestamp > strftime('%s', 'now', '-$HOURS hours'))) as percentage
+FROM market_snapshots
+WHERE timestamp > strftime('%s', 'now', '-$HOURS hours')
+GROUP BY sentiment
+ORDER BY count DESC;
+EOF
+        ;;
+    compare|cmp)
+        cd "$PROJECT_DIR"
+        echo "🔄 Current vs 24h ago:"
+        sqlite3 "$DB" << EOF
+WITH current AS (
+    SELECT composite_score, total_volume, total_oi, sentiment
+    FROM market_snapshots
+    ORDER BY timestamp DESC
+    LIMIT 1
+),
+past AS (
+    SELECT composite_score, total_volume, total_oi, sentiment
+    FROM market_snapshots
+    WHERE timestamp < strftime('%s', 'now', '-23 hours')
+    ORDER BY timestamp DESC
+    LIMIT 1
+)
+SELECT
+    'Score: ' || printf('%.3f', current.composite_score) || ' → ' || printf('%.3f', past.composite_score) || ' (' ||
+    CASE
+        WHEN current.composite_score > past.composite_score THEN '📈'
+        WHEN current.composite_score < past.composite_score THEN '📉'
+        ELSE '➡️'
+    END || ')' as metric
+FROM current, past
+UNION ALL
+SELECT
+    'Volume: $' || printf('%.1fB', current.total_volume/1e9) || ' → $' || printf('%.1fB', past.total_volume/1e9)
+FROM current, past
+UNION ALL
+SELECT
+    'Sentiment: ' || current.sentiment || ' → ' || past.sentiment
+FROM current, past;
+EOF
+        ;;
+    export|exp)
+        cd "$PROJECT_DIR"
+        FILENAME="market_data_export_$(date +%Y%m%d_%H%M%S).csv"
+        echo "💾 Exporting to $FILENAME..."
+        sqlite3 -header -csv "$DB" "SELECT * FROM market_snapshots ORDER BY timestamp DESC" > "$FILENAME"
+        echo "✅ Exported $(wc -l < $FILENAME) rows to $FILENAME"
+        ;;
+    path|p)
+        echo "Project: $PROJECT_DIR"
+        echo "Python:  $VENV"
+        echo "DB:      $DB"
+        echo "Logs:    $LOG"
+        ;;
+    *)
+        cat << 'EOF'
+Crypto Perps Tracker Control
+
+Usage: ct <command> [options]
+
+📊 Data Commands:
+  snapshot, s           Log market snapshot now
+  stats, st             Show database statistics
+  recent, r [n]         Show last n snapshots (default 5)
+  trends, tr [hours]    Sentiment trends (default 24h)
+  compare, cmp          Compare current vs 24h ago
+
+💾 Database Commands:
+  db                    Show database info
+  query, q "SQL"        Run custom SQL query
+  init                  Initialize database
+  cleanup, clean [days] Remove old data (default 90 days)
+  export, exp           Export data to CSV
+
+📈 Market Data:
+  liquidations, liq [h] Fetch liquidations (default 1h)
+
+📋 Monitoring:
+  log, l                Tail logs (live)
+  logs [n]              Show last n log lines (default 50)
+  tail, t [n]           Show last n log lines (default 20)
+  cron                  Show crontab entries
+
+🔧 Utilities:
+  path, p               Show file paths
+
+Examples:
+  ct s                  # Take snapshot now
+  ct stats              # View database stats
+  ct recent 10          # Last 10 snapshots
+  ct trends 48          # 48h sentiment trends
+  ct liq 24             # Last 24h liquidations
+  ct cleanup 30         # Keep only 30 days
+  ct query "SELECT COUNT(*) FROM market_snapshots"
+EOF
+        ;;
+esac
