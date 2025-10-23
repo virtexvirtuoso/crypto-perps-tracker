@@ -47,6 +47,9 @@ data/*.txt
 data/*.png
 data/style-comparisons/
 
+# Documentation
+docs/
+
 # Logs
 *.log
 logs/
