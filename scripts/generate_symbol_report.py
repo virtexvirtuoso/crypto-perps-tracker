@@ -822,7 +822,7 @@ def format_symbol_report(symbol_data: Dict[str, List[Dict]], top_n: int = 20) ->
 
     output = []
     output.append("\n" + "="*150)
-    output.append(f"{'SYMBOL-BY-SYMBOL MARKET REPORT':^150}")
+    output.append(f"{'TOKEN ANALYTICS INTEL':^150}")
     output.append(f"{'Cross-Exchange Analysis • Generated: ' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'):^150}")
     output.append(f"{'Powered by Virtuoso Crypto [virtuosocrypto.com]':^150}")
     output.append("="*150)
@@ -1566,7 +1566,7 @@ def generate_bitcoin_beta_chart(analyses: List[Dict], top_n: int = 15) -> bytes:
 
 
 def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], historical_data: Dict[str, List[Dict]], webhook_url: str) -> bool:
-    """Send symbol report to Discord as summary embed + file attachment"""
+    """Send Token Analytics Intel to Discord as summary embed + file attachment"""
 
     try:
         # Calculate summary metrics
@@ -1601,7 +1601,7 @@ def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], histor
 
         # Create summary embed
         embed = {
-            "title": f"📈 Symbol-by-Symbol Market Report - {datetime.now(timezone.utc).strftime('%b %d, %Y %H:%M UTC')}",
+            "title": f"📈 Token Analytics Intel - {datetime.now(timezone.utc).strftime('%b %d, %Y %H:%M UTC')}",
             "description": (
                 f"**Symbols Tracked:** {total_symbols}\n"
                 f"**Total Volume:** ${total_volume/1e9:.2f}B\n"
@@ -1737,7 +1737,7 @@ def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], histor
 
         if response.status_code == 200:
             chart_count = sum([bool(volume_chart), bool(funding_chart), bool(arbitrage_chart), bool(beta_chart)])
-            print(f"\n✅ Symbol report sent to Discord!")
+            print(f"\n✅ Token Analytics Intel sent to Discord!")
             print(f"   • Summary embed posted")
             print(f"   • Full report attached: {filename}")
             print(f"   • {chart_count}/4 charts attached")
@@ -1763,7 +1763,7 @@ def send_symbol_report_to_discord(report_text: str, analyses: List[Dict], histor
 
 
 if __name__ == "__main__":
-    print("\n🚀 Generating Symbol-by-Symbol Market Report...\n")
+    print("\n🚀 Generating Token Analytics Intel...\n")
     print("⏳ Fetching data from 8 exchanges (30-40 seconds)...\n")
 
     # Fetch and group data
