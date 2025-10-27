@@ -458,7 +458,10 @@ Examples:
         # Use Container architecture for data fetching
         config = Config.from_yaml('config/config.yaml')
         container = Container(config)
-        results = container.exchange_service.fetch_all_markets()
+        market_data_list = container.exchange_service.fetch_all_markets()
+
+        # Convert MarketData objects to dicts for compatibility with analysis functions
+        results = [md.model_dump() for md in market_data_list]
 
         fetch_time = (time.time() - start_time) * 1000
 
