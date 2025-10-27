@@ -458,7 +458,7 @@ Examples:
         # Use Container architecture for data fetching
         config = Config.from_yaml('config/config.yaml')
         container = Container(config)
-        results = container.exchange_service.fetch_all_perps()
+        results = container.exchange_service.fetch_all_markets()
 
         fetch_time = (time.time() - start_time) * 1000
 
