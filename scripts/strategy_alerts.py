@@ -5,6 +5,10 @@ Monitors market conditions and alerts when optimal strategies are detected
 """
 
 import sys
+from pathlib import Path
+# Add project root to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import os
 import requests
 from datetime import datetime, timezone, timedelta
@@ -13,7 +17,6 @@ import yaml
 from dotenv import load_dotenv
 import argparse
 import json
-from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
