@@ -460,8 +460,20 @@ Examples:
         container = Container(config)
         market_data_list = container.exchange_service.fetch_all_markets()
 
-        # Convert MarketData objects to dicts for compatibility with analysis functions
-        results = [md.model_dump() for md in market_data_list]
+        # Convert MarketData objects to dicts and transform to old format
+        results = []
+        for md in market_data_list:
+            data = md.model_dump()
+            # Transform to old format expected by analysis functions
+            results.append({
+                'exchange': data['exchange'],
+                'status': 'success',
+                'volume': data.get('volume_24h', 0),
+                'open_interest': data.get('open_interest', 0),
+                'funding_rate': data.get('funding_rate', 0),
+                'type': 'CEX',  # Default, can enhance later
+                'data': data
+            })
 
         fetch_time = (time.time() - start_time) * 1000
 
