@@ -7,21 +7,81 @@ Monitors market conditions and alerts when optimal strategies are detected
 import sys
 import os
 import requests
-from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Tuple, Optional
 import yaml
 from dotenv import load_dotenv
+import argparse
+import json
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
 
-from generate_market_report import (
-    fetch_all_enhanced,
-    analyze_market_sentiment,
-    identify_arbitrage_opportunities,
-    calculate_market_dominance,
-    analyze_basis_metrics  # NEW: Spot-futures basis analysis
-)
+# Import from new architecture
+from src.container import Container
+from src.models.config import Config
+
+# Import analysis functions from src/analysis/ (Phase 3 complete!)
+from src.analysis.sentiment import analyze_market_sentiment
+from src.analysis.arbitrage import identify_arbitrage_opportunities
+from src.analysis.dominance import calculate_market_dominance
+from src.analysis.basis import analyze_basis_metrics
+
+
+# ========================================
+# STRATEGY TIER CLASSIFICATIONS
+# ========================================
+# Tier 1: CRITICAL - Immediate action required (alert immediately)
+# Tier 2: HIGH PRIORITY - Act within 1-4 hours (alert with validation)
+# Tier 3-4: BACKGROUND - Longer timeframe (scheduled reports only)
+
+STRATEGY_TIERS = {
+    # Tier 1 - CRITICAL
+    'Liquidation Cascade Risk': 1,
+    'Momentum Breakout': 1,
+    'Institutional-Retail Divergence': 1,
+
+    # Tier 2 - HIGH PRIORITY
+    'Contrarian Play': 2,
+    'Breakout Trading': 2,
+    'Volatility Expansion': 2,
+    'Trend Following': 2,
+
+    # Tier 3-4 - BACKGROUND (not alerted in real-time)
+    'Range Trading': 3,
+    'Scalping': 3,
+    'Delta Neutral': 3,
+    'Delta Neutral / Market Making': 3,
+    'Funding Rate Arbitrage': 3,
+    'Funding Arbitrage': 3,
+    'Basis Arbitrage': 3,
+    'Contango/Backwardation': 3,
+    'Contango/Backwardation Play': 3,
+    'Mean Reversion': 3,
+}
+
+
+def get_strategy_tier(strategy_name: str) -> int:
+    """
+    Get the tier (urgency level) of a strategy
+
+    Returns:
+        1 = CRITICAL (immediate)
+        2 = HIGH PRIORITY (within hours)
+        3-4 = BACKGROUND (scheduled reports only)
+    """
+    # Try exact match first
+    if strategy_name in STRATEGY_TIERS:
+        return STRATEGY_TIERS[strategy_name]
+
+    # Try partial match (handles variations like "Trend Following (BULLISH)")
+    for key, tier in STRATEGY_TIERS.items():
+        if key in strategy_name or strategy_name.startswith(key):
+            return tier
+
+    # Default to tier 3 if unknown
+    return 3
 
 
 def load_config() -> Dict:
@@ -35,6 +95,219 @@ def load_config() -> Dict:
     except Exception as e:
         print(f"Warning: Could not load config: {e}")
         return {}
+
+
+# ========================================
+# ALERT STATE MANAGEMENT (Phase 2)
+# ========================================
+
+STATE_FILE = 'data/alert_state.json'
+
+# Cooldown periods by tier (in hours)
+COOLDOWN_HOURS = {
+    1: 1,   # Tier 1 (CRITICAL): 1 hour cooldown
+    2: 2,   # Tier 2 (HIGH): 2 hour cooldown
+    3: 4,   # Tier 3+ (BACKGROUND): 4 hour cooldown
+}
+
+# Alert limits
+MAX_ALERTS_PER_STRATEGY_PER_DAY = 3
+MAX_ALERTS_PER_HOUR = 10
+MIN_CONFIDENCE_DELTA = 20  # Minimum confidence change to re-alert
+
+
+def load_alert_state() -> Dict:
+    """
+    Load alert state from JSON file
+
+    Returns:
+        Dictionary with state data or empty state if file doesn't exist
+    """
+    try:
+        if Path(STATE_FILE).exists():
+            with open(STATE_FILE, 'r') as f:
+                return json.load(f)
+        else:
+            # Initialize empty state
+            return {
+                'last_updated': datetime.now(timezone.utc).isoformat(),
+                'strategies': {},
+                'daily_stats': {
+                    'date': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+                    'total_alerts': 0,
+                    'alerts_by_tier': {'tier_1': 0, 'tier_2': 0, 'tier_3': 0},
+                    'suppressed_alerts': 0,
+                    'hourly_counts': {}
+                }
+            }
+    except Exception as e:
+        print(f"⚠️  Error loading alert state: {e}")
+        return load_alert_state()  # Return empty state
+
+
+def save_alert_state(state: Dict) -> None:
+    """
+    Save alert state to JSON file
+
+    Args:
+        state: State dictionary to save
+    """
+    try:
+        # Ensure data directory exists
+        Path('data').mkdir(exist_ok=True)
+
+        # Update timestamp
+        state['last_updated'] = datetime.now(timezone.utc).isoformat()
+
+        with open(STATE_FILE, 'w') as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"⚠️  Error saving alert state: {e}")
+
+
+def reset_daily_stats_if_needed(state: Dict) -> Dict:
+    """
+    Reset daily statistics if it's a new day
+
+    Args:
+        state: Current state dictionary
+
+    Returns:
+        Updated state dictionary
+    """
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    current_date = state.get('daily_stats', {}).get('date', '')
+
+    if today != current_date:
+        print(f"📅 New day detected. Resetting daily stats...")
+        state['daily_stats'] = {
+            'date': today,
+            'total_alerts': 0,
+            'alerts_by_tier': {'tier_1': 0, 'tier_2': 0, 'tier_3': 0},
+            'suppressed_alerts': 0,
+            'hourly_counts': {}
+        }
+
+    return state
+
+
+def should_alert(strategy_name: str, confidence: int, direction: str, state: Dict) -> Tuple[bool, str]:
+    """
+    Determine if an alert should be sent based on deduplication rules
+
+    Args:
+        strategy_name: Name of the strategy
+        confidence: Confidence percentage
+        direction: Trading direction
+        state: Current alert state
+
+    Returns:
+        Tuple of (should_alert: bool, reason: str)
+    """
+    now = datetime.now(timezone.utc)
+    tier = get_strategy_tier(strategy_name)
+    cooldown_hours = COOLDOWN_HOURS.get(tier, 2)
+
+    # Check if strategy has been alerted before
+    strategy_state = state['strategies'].get(strategy_name, {})
+
+    # NEW STRATEGY - Always alert
+    if not strategy_state:
+        return True, "NEW setup detected"
+
+    # Parse last alert time
+    last_alert_str = strategy_state.get('last_alert_time')
+    if last_alert_str:
+        last_alert_time = datetime.fromisoformat(last_alert_str.replace('Z', '+00:00'))
+
+        # COOLDOWN CHECK - Within cooldown period?
+        time_since_last = (now - last_alert_time).total_seconds() / 3600  # Hours
+        if time_since_last < cooldown_hours:
+            remaining = cooldown_hours - time_since_last
+            return False, f"Cooldown active ({remaining:.1f}h remaining)"
+
+    # CONFIDENCE DELTA CHECK - Significant change?
+    last_confidence = strategy_state.get('last_confidence', 0)
+    confidence_change = abs(confidence - last_confidence)
+
+    if confidence_change < MIN_CONFIDENCE_DELTA:
+        return False, f"Confidence change too small ({confidence_change}% < {MIN_CONFIDENCE_DELTA}%)"
+
+    # DAILY LIMIT CHECK - Too many alerts today?
+    alert_count_today = strategy_state.get('alert_count_today', 0)
+    if alert_count_today >= MAX_ALERTS_PER_STRATEGY_PER_DAY:
+        return False, f"Daily limit reached ({alert_count_today}/{MAX_ALERTS_PER_STRATEGY_PER_DAY})"
+
+    # GLOBAL HOURLY LIMIT CHECK
+    current_hour = now.strftime('%Y-%m-%d-%H')
+    hourly_counts = state['daily_stats'].get('hourly_counts', {})
+    alerts_this_hour = hourly_counts.get(current_hour, 0)
+
+    if alerts_this_hour >= MAX_ALERTS_PER_HOUR:
+        return False, f"Global hourly limit reached ({alerts_this_hour}/{MAX_ALERTS_PER_HOUR})"
+
+    # All checks passed
+    return True, f"Confidence increased {confidence_change}%"
+
+
+def update_alert_state(strategy_name: str, confidence: int, direction: str, state: Dict) -> Dict:
+    """
+    Update state after sending an alert
+
+    Args:
+        strategy_name: Name of the strategy
+        confidence: Confidence percentage
+        direction: Trading direction
+        state: Current alert state
+
+    Returns:
+        Updated state dictionary
+    """
+    now = datetime.now(timezone.utc)
+    tier = get_strategy_tier(strategy_name)
+    cooldown_hours = COOLDOWN_HOURS.get(tier, 2)
+
+    # Update strategy state
+    strategy_state = state['strategies'].get(strategy_name, {
+        'alert_count_today': 0
+    })
+
+    strategy_state.update({
+        'last_alert_time': now.isoformat(),
+        'last_confidence': confidence,
+        'last_direction': direction,
+        'alert_count_today': strategy_state.get('alert_count_today', 0) + 1,
+        'cooldown_until': (now + timedelta(hours=cooldown_hours)).isoformat()
+    })
+
+    state['strategies'][strategy_name] = strategy_state
+
+    # Update daily stats
+    state['daily_stats']['total_alerts'] += 1
+    tier_key = f'tier_{tier}'
+    state['daily_stats']['alerts_by_tier'][tier_key] = state['daily_stats']['alerts_by_tier'].get(tier_key, 0) + 1
+
+    # Update hourly count
+    current_hour = now.strftime('%Y-%m-%d-%H')
+    hourly_counts = state['daily_stats'].get('hourly_counts', {})
+    hourly_counts[current_hour] = hourly_counts.get(current_hour, 0) + 1
+    state['daily_stats']['hourly_counts'] = hourly_counts
+
+    return state
+
+
+def increment_suppressed_count(state: Dict) -> Dict:
+    """
+    Increment the suppressed alerts counter
+
+    Args:
+        state: Current alert state
+
+    Returns:
+        Updated state dictionary
+    """
+    state['daily_stats']['suppressed_alerts'] = state['daily_stats'].get('suppressed_alerts', 0) + 1
+    return state
 
 
 def detect_range_trading_setup(sentiment: Dict, dominance: Dict, results: List[Dict] = None) -> Tuple[bool, Dict]:
@@ -1188,6 +1461,76 @@ def analyze_all_strategies(results: List[Dict]) -> List[Dict]:
     return alerts
 
 
+def filter_alerts(alerts: List[Dict], tiers: List[int] = None, min_confidence: int = 50,
+                  enable_dedup: bool = False, state: Optional[Dict] = None) -> Tuple[List[Dict], Dict, Dict]:
+    """
+    Filter alerts based on tier, minimum confidence, and deduplication rules
+
+    Args:
+        alerts: List of alert dictionaries
+        tiers: List of tier numbers to include (e.g., [1, 2] for Tier 1 and 2 only)
+               If None, include all tiers
+        min_confidence: Minimum confidence percentage (default 50)
+        enable_dedup: Enable deduplication logic (Phase 2)
+        state: Alert state dictionary (required if enable_dedup=True)
+
+    Returns:
+        Tuple of (filtered_alerts, updated_state, filter_stats)
+    """
+    filtered = []
+    filter_stats = {
+        'total_checked': len(alerts),
+        'tier_filtered': 0,
+        'confidence_filtered': 0,
+        'dedup_suppressed': 0,
+        'passed': 0
+    }
+
+    # Initialize state if dedup enabled
+    if enable_dedup and state is None:
+        state = load_alert_state()
+        state = reset_daily_stats_if_needed(state)
+
+    for alert in alerts:
+        strategy_name = alert.get('strategy', '')
+        confidence = alert.get('confidence', 0)
+        direction = alert.get('direction', 'N/A')
+        tier = get_strategy_tier(strategy_name)
+
+        # Check tier filter
+        if tiers is not None and tier not in tiers:
+            filter_stats['tier_filtered'] += 1
+            continue
+
+        # Check confidence filter
+        if confidence < min_confidence:
+            filter_stats['confidence_filtered'] += 1
+            continue
+
+        # Check deduplication rules (Phase 2)
+        if enable_dedup:
+            should_send, reason = should_alert(strategy_name, confidence, direction, state)
+
+            if not should_send:
+                filter_stats['dedup_suppressed'] += 1
+                state = increment_suppressed_count(state)
+                print(f"   🔇 Suppressed: {strategy_name} ({confidence}%) - {reason}")
+                continue
+            else:
+                # Update state for alerts we're sending
+                state = update_alert_state(strategy_name, confidence, direction, state)
+                print(f"   ✅ Alerting: {strategy_name} ({confidence}%) - {reason}")
+
+        filtered.append(alert)
+        filter_stats['passed'] += 1
+
+    # Save state if dedup enabled
+    if enable_dedup and state:
+        save_alert_state(state)
+
+    return filtered, state, filter_stats
+
+
 def send_strategy_alert_to_discord(alerts: List[Dict], webhook_url: str) -> bool:
     """Send strategy alerts to Discord"""
 
@@ -1306,26 +1649,145 @@ def send_strategy_alert_to_discord(alerts: List[Dict], webhook_url: str) -> bool
 
 def main():
     """Main function"""
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description='Crypto Perpetual Futures Strategy Alert System',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # PHASE 1: Alert on Tier 1-2 strategies only with 85%+ confidence (no dedup)
+  python strategy_alerts.py --tier 1,2 --min-confidence 85
+
+  # PHASE 2: Same as Phase 1 but with deduplication (recommended)
+  python strategy_alerts.py --tier 1,2 --min-confidence 80 --enable-dedup
+
+  # Alert on Tier 1 (CRITICAL) only with dedup
+  python strategy_alerts.py --tier 1 --min-confidence 70 --enable-dedup
+
+  # All strategies with 50%+ confidence (not recommended - too noisy)
+  python strategy_alerts.py
+        """
+    )
+    parser.add_argument(
+        '--tier',
+        type=str,
+        default=None,
+        help='Comma-separated tier numbers to alert on (1=CRITICAL, 2=HIGH, 3+=BACKGROUND). Example: 1,2'
+    )
+    parser.add_argument(
+        '--min-confidence',
+        type=int,
+        default=50,
+        help='Minimum confidence percentage for alerts (default: 50)'
+    )
+    parser.add_argument(
+        '--enable-dedup',
+        action='store_true',
+        help='Enable deduplication logic (Phase 2) - prevents repeat alerts'
+    )
+    args = parser.parse_args()
+
+    # Parse tier filter
+    tier_filter = None
+    if args.tier:
+        try:
+            tier_filter = [int(t.strip()) for t in args.tier.split(',')]
+            print(f"📊 Tier filter: {tier_filter} (1=CRITICAL, 2=HIGH, 3+=BACKGROUND)")
+        except ValueError:
+            print(f"❌ Invalid tier format: {args.tier}. Use comma-separated numbers like: 1,2")
+            return
+
+    print(f"📊 Minimum confidence: {args.min_confidence}%")
+
+    if args.enable_dedup:
+        print(f"🔒 Deduplication: ENABLED (Phase 2)")
+        print(f"   - Cooldowns: Tier 1={COOLDOWN_HOURS[1]}h, Tier 2={COOLDOWN_HOURS[2]}h")
+        print(f"   - Max per strategy/day: {MAX_ALERTS_PER_STRATEGY_PER_DAY}")
+        print(f"   - Max per hour (global): {MAX_ALERTS_PER_HOUR}")
+        print(f"   - Min confidence delta: {MIN_CONFIDENCE_DELTA}%")
+    else:
+        print(f"🔓 Deduplication: DISABLED (Phase 1)")
+
     print("\n🔍 Analyzing market for trading strategy opportunities...\n")
 
     # Load config
     config = load_config()
-    webhook_url = config.get('discord', {}).get('webhook_url')
+
+    # Try to get strategy_alerts webhook first, fallback to discord webhook
+    webhook_url = config.get('strategy_alerts', {}).get('webhook_url')
+    if not webhook_url:
+        webhook_url = config.get('discord', {}).get('webhook_url')
 
     if not webhook_url:
         print("⚠️  No Discord webhook configured. Alerts will be displayed only.")
         print("   Configure webhook_url in config/config.yaml to enable Discord alerts.\n")
 
-    # Fetch data
-    print("⏳ Fetching data from 8 exchanges (20-30 seconds)...\n")
-    results = fetch_all_enhanced()
+    # Fetch data using new architecture
+    print("⏳ Fetching data from exchanges (20-30 seconds)...\n")
+
+    # Initialize container with config
+    app_config = Config.from_yaml('config/config.yaml')
+    container = Container(app_config)
+
+    # Fetch markets using ExchangeService
+    markets = container.exchange_service.fetch_all_markets()
+
+    # Convert MarketData objects to dict format expected by legacy code
+    results = []
+    for market in markets:
+        results.append({
+            'exchange': market.exchange.value,
+            'volume': market.volume_24h,
+            'open_interest': market.open_interest,
+            'funding_rate': market.funding_rate,
+            'price_change_pct': getattr(market, 'price_change_24h_pct', None),
+            'status': 'success'
+        })
 
     # Analyze strategies
-    alerts = analyze_all_strategies(results)
+    all_alerts = analyze_all_strategies(results)
+
+    # Apply filters (with optional deduplication)
+    alerts, updated_state, filter_stats = filter_alerts(
+        all_alerts,
+        tiers=tier_filter,
+        min_confidence=args.min_confidence,
+        enable_dedup=args.enable_dedup
+    )
+
+    # Show filtering statistics
+    print(f"\n📊 Filtering Results:")
+    print(f"   Total strategies checked: {filter_stats['total_checked']}")
+    print(f"   Filtered by tier: {filter_stats['tier_filtered']}")
+    print(f"   Filtered by confidence: {filter_stats['confidence_filtered']}")
+
+    if args.enable_dedup:
+        print(f"   Suppressed by dedup: {filter_stats['dedup_suppressed']}")
+        print(f"   Passed all filters: {filter_stats['passed']}")
+
+        # Show daily statistics
+        if updated_state:
+            daily_stats = updated_state.get('daily_stats', {})
+            print(f"\n📈 Today's Statistics ({daily_stats.get('date', 'N/A')}):")
+            print(f"   Total alerts sent: {daily_stats.get('total_alerts', 0)}")
+            print(f"   Total suppressed: {daily_stats.get('suppressed_alerts', 0)}")
+
+            alerts_by_tier = daily_stats.get('alerts_by_tier', {})
+            if alerts_by_tier:
+                print(f"   Alerts by tier:")
+                print(f"      Tier 1 (CRITICAL): {alerts_by_tier.get('tier_1', 0)}")
+                print(f"      Tier 2 (HIGH): {alerts_by_tier.get('tier_2', 0)}")
+                print(f"      Tier 3+ (BACKGROUND): {alerts_by_tier.get('tier_3', 0)}")
+    else:
+        print(f"   Passed filters: {filter_stats['passed']}")
+
+    print()
 
     if not alerts:
         print("✅ Market analyzed. No high-confidence strategy setups detected.")
         print("   Current conditions don't favor any specific strategy.\n")
+        if all_alerts:
+            print(f"   ({len(all_alerts)} lower-confidence alert(s) were filtered out)")
         return
 
     # Display alerts
