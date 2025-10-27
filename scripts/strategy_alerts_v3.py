@@ -456,7 +456,7 @@ Examples:
         start_time = time.time()
 
         # Use Container architecture for data fetching
-        config = Config.from_yaml('config.yaml')
+        config = Config.from_yaml('config/config.yaml')
         container = Container(config)
         results = container.exchange_service.fetch_all_perps()
 
