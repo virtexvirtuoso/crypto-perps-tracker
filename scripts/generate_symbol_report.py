@@ -227,7 +227,7 @@ def format_symbol_report(analyses: List[Dict], top_n: int = 20) -> str:
         exchanges_str = f"{a['num_exchanges']}x"
         price_str = f"${a['avg_price']:,.2f}"
         spread_str = f"{a['price_spread_pct']:.2f}%"
-        funding_str = f"{a['avg_funding_rate']:.3f}%" if a['avg_funding_rate'] is not None else "N/A"
+        funding_str = f"{a['avg_funding_rate']:.5f}%" if a['avg_funding_rate'] is not None else "N/A"
         change_str = f"{a['avg_price_change_24h']:+.1f}%" if a['avg_price_change_24h'] is not None else "N/A"
 
         output.append(
@@ -250,9 +250,9 @@ def format_symbol_report(analyses: List[Dict], top_n: int = 20) -> str:
         output.append(f"   Best Liquidity: {a['best_liquidity_venue']} (${a['liquidity_volume']/1e9:.2f}B)")
 
         if a['best_long_venue']:
-            output.append(f"   Best for LONGS: {a['best_long_venue'][0]} (funding: {a['best_long_venue'][1]:.3f}%)")
+            output.append(f"   Best for LONGS: {a['best_long_venue'][0]} (funding: {a['best_long_venue'][1]:.5f}%)")
         if a['best_short_venue']:
-            output.append(f"   Best for SHORTS: {a['best_short_venue'][0]} (funding: {a['best_short_venue'][1]:.3f}%)")
+            output.append(f"   Best for SHORTS: {a['best_short_venue'][0]} (funding: {a['best_short_venue'][1]:.5f}%)")
 
         if a['arbitrage_opportunity']:
             arb = a['arbitrage_opportunity']
@@ -606,28 +606,54 @@ def generate_funding_comparison_chart(analyses: List[Dict], top_n: int = 15) -> 
     except ImportError:
         plt.style.use('dark_background')
 
-    # Get top symbols by volume that have funding data
+    # Get symbols with funding data
     symbols_with_funding = [a for a in analyses if a.get('avg_funding_rate') is not None]
-    top_symbols = symbols_with_funding[:top_n]
+
+    # Filter symbols with significant funding rates (|rate| > 0.005% or ~18% annual)
+    # OR include top 5 by volume even if neutral (for context)
+    significant_funding = [a for a in symbols_with_funding if abs(a.get('avg_funding_rate', 0)) > 0.005]
+    top_by_volume = symbols_with_funding[:5]
+
+    # Combine and deduplicate
+    combined = {a['symbol']: a for a in (significant_funding + top_by_volume)}
+    filtered_symbols = list(combined.values())
+
+    # Sort by absolute funding rate (most extreme first)
+    filtered_symbols.sort(key=lambda x: abs(x.get('avg_funding_rate', 0)), reverse=True)
+
+    # Take top N
+    top_symbols = filtered_symbols[:top_n]
+
+    # If we have fewer than 8 symbols, add more by volume
+    if len(top_symbols) < 8:
+        remaining = [a for a in symbols_with_funding if a['symbol'] not in {s['symbol'] for s in top_symbols}]
+        top_symbols.extend(remaining[:8 - len(top_symbols)])
 
     symbols = [a['symbol'][:6] for a in top_symbols]
     funding_rates = [a['avg_funding_rate'] for a in top_symbols]
 
-    # Color based on funding rate
+    # Color based on funding rate (more sensitive thresholds)
     colors = []
     for rate in funding_rates:
-        if rate > 0.03:
-            colors.append('#FF6B35')  # Red - expensive longs
-        elif rate < -0.03:
-            colors.append('#00FF7F')  # Green - profitable longs
+        if rate > 0.01:  # > 0.01% (>36% annual) - expensive longs
+            colors.append('#FF6B35')  # Red
+        elif rate < -0.01:  # < -0.01% - profitable longs
+            colors.append('#00FF7F')  # Green
+        elif rate > 0.005:  # Slight bullish
+            colors.append('#FFA500')  # Orange
+        elif rate < -0.005:  # Slight bearish
+            colors.append('#90EE90')  # Light green
         else:
             colors.append('#FDB44B')  # Amber - neutral
 
-    # Create chart
-    fig, ax = plt.subplots(figsize=(12, 7))
+    # Create chart - dynamic height based on number of symbols
+    num_symbols = len(symbols)
+    fig_height = max(8, num_symbols * 0.55)  # At least 8 inches, 0.55 inches per symbol
+    fig, ax = plt.subplots(figsize=(14, fig_height))
 
-    # Create bars
-    bars = ax.barh(symbols, funding_rates, color=colors, alpha=0.9, edgecolor='#FFA500', linewidth=2)
+    # Create bars with adjusted height
+    bar_height = 0.7  # Slightly thinner bars for better spacing
+    bars = ax.barh(symbols, funding_rates, height=bar_height, color=colors, alpha=0.9, edgecolor='#FFA500', linewidth=1.5)
 
     # Add glow effect
     try:
@@ -648,17 +674,27 @@ def generate_funding_comparison_chart(analyses: List[Dict], top_n: int = 15) -> 
         ax.text(x_pos, bar.get_y() + bar.get_height() / 2,
                 f' {rate:.3f}% ({annual:+.1f}% annual)',
                 ha=ha, va='center',
-                fontsize=9, fontweight='bold', color='#FFD700',
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='#1a1a1a', edgecolor='#FFA500', alpha=0.8, linewidth=1))
+                fontsize=8, fontweight='bold', color='#FFD700',
+                bbox=dict(boxstyle='round,pad=0.25', facecolor='#1a1a1a', edgecolor='#FFA500', alpha=0.8, linewidth=0.8))
 
     # Styling
-    ax.set_xlabel('Funding Rate (% per 8h)', fontsize=13, fontweight='bold', color='#FFD700', labelpad=10)
-    ax.set_title(f'💰 Funding Rates - Top {top_n} Symbols by Volume', fontsize=15, fontweight='bold', pad=20, color='#FFA500')
+    ax.set_xlabel('Funding Rate (% per 8h)', fontsize=12, fontweight='bold', color='#FFD700', labelpad=10)
+    ax.set_title(f'💰 Funding Rates - Symbols by Significance', fontsize=14, fontweight='bold', pad=15, color='#FFA500')
 
     # Reference line at zero
-    ax.axvline(x=0, color='#888888', linestyle='-', linewidth=1.5, alpha=0.8)
+    ax.axvline(x=0, color='#888888', linestyle='-', linewidth=1.5, alpha=0.8, label='Neutral')
+
+    # Add threshold markers for context
+    if any(abs(r) > 0.01 for r in funding_rates):
+        ax.axvline(x=0.01, color='#FF6B35', linestyle='--', linewidth=1, alpha=0.4, label='High Long Cost')
+        ax.axvline(x=-0.01, color='#00FF7F', linestyle='--', linewidth=1, alpha=0.4, label='High Short Cost')
+
     ax.grid(axis='x', alpha=0.2, color='#FFD700', linewidth=0.5)
-    ax.tick_params(axis='both', colors='#FFD700', labelsize=10)
+    ax.tick_params(axis='both', colors='#FFD700', labelsize=9)
+
+    # Add legend if threshold markers exist
+    if any(abs(r) > 0.01 for r in funding_rates):
+        ax.legend(loc='lower right', fontsize=8, framealpha=0.7, facecolor='#1a1a1a', edgecolor='#FFA500')
 
     # Dark background styling
     ax.set_facecolor('#0a0a0a')
