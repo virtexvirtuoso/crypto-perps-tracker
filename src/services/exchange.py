@@ -171,11 +171,14 @@ class ExchangeService:
         try:
             data = client.fetch_volume()
 
+            # Filter blacklisted symbols
+            filtered_data = self._filter_blacklisted_symbols(data)
+
             # Cache result
             if use_cache:
-                self.cache.set(cache_key, data)
+                self.cache.set(cache_key, filtered_data)
 
-            return data
+            return filtered_data
         except Exception as e:
             print(f"Error fetching {exchange}: {e}")
             return None
