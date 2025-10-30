@@ -27,13 +27,13 @@ from scripts.generate_symbol_report import (
 )
 
 
-@cached(ttl_seconds=30)
+@cached(ttl_seconds=120)
 def get_symbol_analytics_cached(container: Container, top_n: int = 20) -> List[Dict]:
     """
     Get comprehensive symbol analytics with caching
 
     Cache key: Based on top_n parameter
-    Cache TTL: 30 seconds
+    Cache TTL: 120 seconds (2 minutes)
 
     Returns list of analyzed symbols sorted by volume
     """
@@ -221,12 +221,12 @@ def get_performance_chart_data(container: Container, analyses: List[Dict], top_n
     return chart_bytes
 
 
-@cached(ttl_seconds=300)  # 5 minute cache for historical data
+@cached(ttl_seconds=600)  # 10 minute cache for historical data
 def get_performance_chart_plotly(container: Container, analyses: List[Dict], top_n: int = 30) -> Dict:
     """
     Fetch historical data and generate interactive Plotly time-series performance chart
 
-    Cache TTL: 5 minutes (historical data doesn't change that often)
+    Cache TTL: 10 minutes (historical data doesn't change that often)
     Returns: Dict with Plotly traces and layout data
     """
     print(f"🔄 Generating interactive 12h performance chart for top {top_n} symbols...")

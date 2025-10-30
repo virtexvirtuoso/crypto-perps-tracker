@@ -43,6 +43,9 @@ app = dash.Dash(
     suppress_callback_exceptions=True
 )
 
+# Expose Flask server for Gunicorn
+server = app.server
+
 # Initialize Container for data fetching
 config = Config.from_yaml('config/config.yaml')
 container = Container(config)
@@ -140,17 +143,22 @@ app.layout = html.Div([
         )
     ]),
 
-    # Main Content
-    html.Div(id='tab-content', style={
-        'maxWidth': '1800px',
-        'margin': '0 auto',
-        'padding': '25px 40px'
-    }),
+    # Main Content with Loading Spinner
+    dcc.Loading(
+        id="loading-content",
+        type="cube",
+        color="#FFA500",
+        children=html.Div(id='tab-content', style={
+            'maxWidth': '1800px',
+            'margin': '0 auto',
+            'padding': '25px 40px'
+        })
+    ),
 
-    # Auto-refresh interval (60 seconds)
+    # Auto-refresh interval (120 seconds)
     dcc.Interval(
         id='interval-component',
-        interval=60*1000,  # 60 seconds in milliseconds
+        interval=120*1000,  # 120 seconds in milliseconds
         n_intervals=0
     ),
 
@@ -281,8 +289,8 @@ def render_content(tab, n):
 
     elif tab == 'symbol-analysis':
         try:
-            # Get comprehensive symbol analytics
-            analyses = get_symbol_analytics(container, top_n=15)
+            # Get comprehensive symbol analytics (reduced from 15 to 12 for faster loading)
+            analyses = get_symbol_analytics(container, top_n=12)
             summary = get_market_summary(analyses)
             arb_opps = get_arbitrage_opportunities(analyses, min_spread=0.2)
 
@@ -453,10 +461,11 @@ def render_content(tab, n):
                 ])
             ]) if arb_opps else html.Div()
 
-            # Generate Interactive 12h Performance Chart (with 5-min cache)
+            # Generate Interactive 12h Performance Chart (with 10-min cache)
             performance_chart_section = html.Div()
             try:
-                chart_data = get_performance_chart_plotly(container, analyses, top_n=30)
+                # Reduced from 30 to 20 symbols for faster loading
+                chart_data = get_performance_chart_plotly(container, analyses, top_n=20)
                 if chart_data:
                     # Create Plotly figure
                     fig = go.Figure()
@@ -519,7 +528,7 @@ def render_content(tab, n):
 
                     performance_chart_section = html.Div([
                         html.H3('🚀 12-Hour Performance Tracker', style={'color': '#FFA500', 'textAlign': 'center', 'marginBottom': '15px'}),
-                        html.P('Interactive chart: Hover for details • Zoom/Pan • Click legend to toggle symbols • Auto-refresh: 5 minutes',
+                        html.P('Interactive chart: Hover for details • Zoom/Pan • Click legend to toggle symbols • Auto-refresh: 10 minutes',
                                style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em', 'marginBottom': '20px'}),
                         dcc.Graph(
                             figure=fig,
@@ -711,20 +720,26 @@ def render_content(tab, n):
 def update_time(n):
     """Update last refresh time"""
     now = datetime.now(timezone.utc)
-    next_refresh = 60 - now.second
+    # Calculate seconds until next 2-minute interval
+    next_refresh = 120 - (now.second + (now.minute % 2) * 60)
     return [
         html.Span('● ', style={'color': '#00ff00'}),
         f"Last Update: {now.strftime('%b %d, %H:%M:%S UTC')} • Auto-refresh in {next_refresh}s"
     ]
 
 if __name__ == '__main__':
+    import os
+
     print("\n🚀 Starting Crypto Perps Dashboard...")
     print("📊 Access at: http://localhost:8050")
-    print("⏱️  Auto-refresh: 60 seconds")
+    print("⏱️  Auto-refresh: 120 seconds")
     print("\nPress Ctrl+C to stop\n")
 
+    # Use debug mode only in development
+    debug_mode = os.getenv('DASH_DEBUG', 'false').lower() == 'true'
+
     app.run(
-        debug=True,
+        debug=debug_mode,
         host='0.0.0.0',
         port=8050
     )
