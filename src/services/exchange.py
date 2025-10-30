@@ -77,10 +77,8 @@ class ExchangeService:
             if pair.symbol not in self.blacklist
         ]
 
-        # Create new MarketData with filtered pairs
-        data_dict = market_data.model_dump()
-        data_dict['top_pairs'] = filtered_pairs
-        return MarketData(**data_dict)
+        # Use copy() method for frozen models
+        return market_data.copy(update={'top_pairs': filtered_pairs})
 
     def fetch_all_markets(self, use_cache: bool = True) -> List[MarketData]:
         """Fetch market data from all exchanges
