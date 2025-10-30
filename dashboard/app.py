@@ -289,8 +289,9 @@ def render_content(tab, n):
 
     elif tab == 'symbol-analysis':
         try:
-            # Get comprehensive symbol analytics (reduced from 15 to 12 for faster loading)
-            analyses = get_symbol_analytics(container, top_n=12)
+            # Get comprehensive symbol analytics (reduced to 8 for much faster loading)
+            # Performance chart disabled by default - too slow
+            analyses = get_symbol_analytics(container, top_n=8)
             summary = get_market_summary(analyses)
             arb_opps = get_arbitrage_opportunities(analyses, min_spread=0.2)
 
@@ -359,8 +360,8 @@ def render_content(tab, n):
             ], style={'width': '100%', 'borderCollapse': 'collapse', 'fontSize': '0.9em'})
 
             # Create charts
-            # 1. Bitcoin Beta Chart
-            beta_analyses = [a for a in analyses[:15] if a.get('btc_beta') is not None]
+            # 1. Bitcoin Beta Chart (show all available)
+            beta_analyses = [a for a in analyses if a.get('btc_beta') is not None]
             if beta_analyses:
                 beta_symbols = [a['symbol'] for a in beta_analyses]
                 beta_values = [a['btc_beta'] for a in beta_analyses]
@@ -390,9 +391,9 @@ def render_content(tab, n):
             else:
                 beta_chart = html.Div()
 
-            # 2. Volume Comparison Chart
-            vol_symbols = [a['symbol'] for a in analyses[:12]]
-            vol_values = [a['total_volume_24h']/1e9 for a in analyses[:12]]
+            # 2. Volume Comparison Chart (show all available)
+            vol_symbols = [a['symbol'] for a in analyses]
+            vol_values = [a['total_volume_24h']/1e9 for a in analyses]
 
             vol_fig = go.Figure([
                 go.Bar(
@@ -404,7 +405,7 @@ def render_content(tab, n):
                 )
             ])
             vol_fig.update_layout(
-                title='Top 12 Symbols by 24h Volume',
+                title=f'Top {len(analyses)} Symbols by 24h Volume',
                 paper_bgcolor='#0a0a0a',
                 plot_bgcolor='#1a1a1a',
                 font={'color': '#FFD700', 'family': 'Courier New'},
@@ -415,8 +416,8 @@ def render_content(tab, n):
             )
             vol_chart = dcc.Graph(figure=vol_fig, config={'displayModeBar': False})
 
-            # 3. Funding Rate Chart
-            funding_analyses = [a for a in analyses[:12] if a.get('avg_funding_rate') is not None]
+            # 3. Funding Rate Chart (show all available)
+            funding_analyses = [a for a in analyses if a.get('avg_funding_rate') is not None]
             if funding_analyses:
                 funding_symbols = [a['symbol'] for a in funding_analyses]
                 funding_rates = [a['avg_funding_rate'] for a in funding_analyses]
@@ -461,85 +462,95 @@ def render_content(tab, n):
                 ])
             ]) if arb_opps else html.Div()
 
-            # Generate Interactive 12h Performance Chart (with 10-min cache)
-            performance_chart_section = html.Div()
-            try:
-                # Reduced from 30 to 20 symbols for faster loading
-                chart_data = get_performance_chart_plotly(container, analyses, top_n=20)
-                if chart_data:
-                    # Create Plotly figure
-                    fig = go.Figure()
+            # PERFORMANCE CHART DISABLED - Too slow (60s+ load time)
+            # TODO: Implement as separate lazy-loaded component
+            performance_chart_section = html.Div([
+                html.Div([
+                    html.H3('⚠️ Performance Chart Temporarily Disabled',
+                           style={'color': '#FFA500', 'textAlign': 'center'}),
+                    html.P('The 12h performance chart requires extensive historical data fetching (~60s). '
+                          'This feature will be re-enabled with database caching in Phase 3.',
+                          style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em'})
+                ], className='dash-graph', style={'padding': '30px', 'marginBottom': '30px'})
+            ])
 
-                    # Add all traces
-                    for trace in chart_data['traces']:
-                        fig.add_trace(go.Scatter(
-                            x=trace['x'],
-                            y=trace['y'],
-                            mode=trace['mode'],
-                            name=trace['name'],
-                            line=trace['line'],
-                            hovertemplate=trace['hovertemplate']
-                        ))
-
-                    # Update layout with dark theme
-                    fig.update_layout(
-                        title={
-                            'text': f"CRYPTO PERFORMANCE TRACKER<br><sub>12h Returns | {chart_data['outperformers']} Outperformers • {chart_data['underperformers']} Underperformers<br>Generated: {chart_data['current_time']}</sub>",
-                            'x': 0.5,
-                            'xanchor': 'center',
-                            'font': {'size': 16, 'color': '#FFA500', 'family': 'Arial Black'}
-                        },
-                        xaxis={
-                            'title': 'Time (12h Period)',
-                            'titlefont': {'color': '#FFD700', 'size': 12},
-                            'tickfont': {'color': '#FFD700', 'size': 10},
-                            'gridcolor': 'rgba(255, 215, 0, 0.08)',
-                            'showgrid': True
-                        },
-                        yaxis={
-                            'title': 'Price Change (%)',
-                            'titlefont': {'color': '#FFD700', 'size': 12},
-                            'tickfont': {'color': '#FFD700', 'size': 10},
-                            'gridcolor': 'rgba(255, 215, 0, 0.08)',
-                            'showgrid': True,
-                            'zeroline': True,
-                            'zerolinecolor': '#888888',
-                            'zerolinewidth': 2
-                        },
-                        plot_bgcolor='#0a0a0a',
-                        paper_bgcolor='#0a0a0a',
-                        font={'color': '#FFD700'},
-                        hovermode='x unified',
-                        showlegend=True,
-                        legend={
-                            'font': {'size': 9, 'color': '#FFD700'},
-                            'bgcolor': 'rgba(26, 26, 26, 0.95)',
-                            'bordercolor': '#FFA500',
-                            'borderwidth': 2,
-                            'orientation': 'v',
-                            'yanchor': 'middle',
-                            'y': 0.5,
-                            'xanchor': 'left',
-                            'x': 1.01
-                        },
-                        height=600,
-                        margin={'l': 50, 'r': 150, 't': 100, 'b': 50}
-                    )
-
-                    performance_chart_section = html.Div([
-                        html.H3('🚀 12-Hour Performance Tracker', style={'color': '#FFA500', 'textAlign': 'center', 'marginBottom': '15px'}),
-                        html.P('Interactive chart: Hover for details • Zoom/Pan • Click legend to toggle symbols • Auto-refresh: 10 minutes',
-                               style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em', 'marginBottom': '20px'}),
-                        dcc.Graph(
-                            figure=fig,
-                            config={'displayModeBar': True, 'displaylogo': False},
-                            style={'border': '2px solid #FFA500', 'borderRadius': '8px'}
-                        )
-                    ], className='dash-graph', style={'marginBottom': '30px'})
-            except Exception as e:
-                print(f"⚠️  Could not generate performance chart: {e}")
-                import traceback
-                traceback.print_exc()
+            # Keep old code for future re-enable (when database caching is implemented):
+            # try:
+            #     chart_data = get_performance_chart_plotly(container, analyses, top_n=20)
+            #     if chart_data:
+            #         # Create Plotly figure
+            #         fig = go.Figure()
+            #
+            #         # Add all traces
+            #         for trace in chart_data['traces']:
+            #             fig.add_trace(go.Scatter(
+            #                 x=trace['x'],
+            #                 y=trace['y'],
+            #                 mode=trace['mode'],
+            #                 name=trace['name'],
+            #                 line=trace['line'],
+            #                 hovertemplate=trace['hovertemplate']
+            #             ))
+            #
+            #         # Update layout with dark theme
+            #         fig.update_layout(
+            #             title={
+            #                 'text': f"CRYPTO PERFORMANCE TRACKER<br><sub>12h Returns | {chart_data['outperformers']} Outperformers • {chart_data['underperformers']} Underperformers<br>Generated: {chart_data['current_time']}</sub>",
+            #                 'x': 0.5,
+            #                 'xanchor': 'center',
+            #                 'font': {'size': 16, 'color': '#FFA500', 'family': 'Arial Black'}
+            #             },
+            #             xaxis={
+            #                 'title': 'Time (12h Period)',
+            #                 'titlefont': {'color': '#FFD700', 'size': 12},
+            #                 'tickfont': {'color': '#FFD700', 'size': 10},
+            #                 'gridcolor': 'rgba(255, 215, 0, 0.08)',
+            #                 'showgrid': True
+            #             },
+            #             yaxis={
+            #                 'title': 'Price Change (%)',
+            #                 'titlefont': {'color': '#FFD700', 'size': 12},
+            #                 'tickfont': {'color': '#FFD700', 'size': 10},
+            #                 'gridcolor': 'rgba(255, 215, 0, 0.08)',
+            #                 'showgrid': True,
+            #                 'zeroline': True,
+            #                 'zerolinecolor': '#888888',
+            #                 'zerolinewidth': 2
+            #             },
+            #             plot_bgcolor='#0a0a0a',
+            #             paper_bgcolor='#0a0a0a',
+            #             font={'color': '#FFD700'},
+            #             hovermode='x unified',
+            #             showlegend=True,
+            #             legend={
+            #                 'font': {'size': 9, 'color': '#FFD700'},
+            #                 'bgcolor': 'rgba(26, 26, 26, 0.95)',
+            #                 'bordercolor': '#FFA500',
+            #                 'borderwidth': 2,
+            #                 'orientation': 'v',
+            #                 'yanchor': 'middle',
+            #                 'y': 0.5,
+            #                 'xanchor': 'left',
+            #                 'x': 1.01
+            #             },
+            #             height=600,
+            #             margin={'l': 50, 'r': 150, 't': 100, 'b': 50}
+            #         )
+            #
+            #         performance_chart_section = html.Div([
+            #             html.H3('🚀 12-Hour Performance Tracker', style={'color': '#FFA500', 'textAlign': 'center', 'marginBottom': '15px'}),
+            #             html.P('Interactive chart: Hover for details • Zoom/Pan • Click legend to toggle symbols • Auto-refresh: 10 minutes',
+            #                    style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em', 'marginBottom': '20px'}),
+            #             dcc.Graph(
+            #                 figure=fig,
+            #                 config={'displayModeBar': True, 'displaylogo': False},
+            #                 style={'border': '2px solid #FFA500', 'borderRadius': '8px'}
+            #             )
+            #         ], className='dash-graph', style={'marginBottom': '30px'})
+            # except Exception as e:
+            #     print(f"⚠️  Could not generate performance chart: {e}")
+            #     import traceback
+            #     traceback.print_exc()
 
             return html.Div([
                 performance_chart_section,  # Performance tracker at the top
