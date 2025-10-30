@@ -172,7 +172,7 @@ def generate_funding_chart_standard(exchanges, rates, colors, style_name):
         try:
             import mplcyberpunk
             mplcyberpunk.add_glow_effects(ax=ax, n_glow_lines=5, alpha_line=0.15)
-        except:
+        except (ImportError, TypeError):
             pass
     elif is_dark:
         # For dark styles, use our Tableau colors

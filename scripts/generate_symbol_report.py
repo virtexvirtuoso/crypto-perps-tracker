@@ -1041,7 +1041,7 @@ def main():
 
     # Fetch historical data for top symbols (for Bitcoin Beta chart)
     print("\n📊 Fetching historical data for charts...")
-    top_symbols = [a['symbol'] for a in analyses[:20]]  # Top 20 symbols
+    top_symbols = [a['symbol'] for a in analyses[:30]]  # Top 30 symbols
     historical_data = fetch_historical_data_for_symbols(top_symbols, limit=12)
 
     # Save Bitcoin Beta chart

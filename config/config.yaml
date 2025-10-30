@@ -15,6 +15,14 @@ exchanges:
     - asterdex
     - dydx
 
+# Blacklisted symbols (excluded from all reports)
+# Add symbols that are delisted, settling, or have data quality issues
+blacklist:
+  symbols:
+    - ALPACAUSDT  # Binance - delisting Apr 30, 2025
+  reasons:
+    ALPACAUSDT: "Force settlement/delisting - distorts analytics"
+
 # API timeouts (seconds)
 timeouts:
   default: 10
@@ -75,3 +83,22 @@ discord:
     trading_patterns: true
     recommendations: true
     anomalies: true
+
+# Strategy Alerts (separate channel)
+strategy_alerts:
+  enabled: true
+  webhook_url: "${DISCORD_STRATEGY_WEBHOOK_URL}"  # Loaded from .env file
+  username: "Strategy Alert Bot"
+
+# Directional Trading Alerts (long/short opportunities)
+directional_alerts:
+  enabled: true
+  webhook_url: ""  # Optional: set DISCORD_DIRECTIONAL_WEBHOOK_URL env var, otherwise falls back to main webhook
+  username: "Directional Alert Bot"
+  check_interval: 14400  # 4 hours in seconds
+  min_confidence: 60  # Only alert on >=60% confidence
+  strategies:
+    high_beta_longs: true
+    parabolic_shorts: true
+    beta_divergence: true
+    funding_extremes: true

@@ -111,7 +111,7 @@ python scripts/generate_market_report.py
 **Send reports to Discord (automated):**
 ```bash
 # Send once
-python scripts/send_discord_report.py
+python scripts/market_report.py
 
 # Automate every 12 hours (add to crontab)
 0 */12 * * * cd ~/Desktop/crypto-perps-tracker && ./scripts/schedule_discord_reports.sh
@@ -125,6 +125,26 @@ python scripts/send_discord_report.py
 - 📊 Historical reports searchable in Discord
 
 **Setup:** See [`docs/DISCORD_INTEGRATION.md`](docs/DISCORD_INTEGRATION.md) for complete guide
+
+**Get directional trading alerts (long/short opportunities):**
+```bash
+python scripts/directional_alerts.py
+```
+
+**Directional Alert Strategies:**
+- 🟢 **High-Beta Longs** - Amplify Bitcoin momentum (2-3x leverage naturally)
+- 🔴 **Parabolic Shorts** - Fade extreme pumps (+100%+ moves)
+- 🎯 **Beta Divergence** - Catch lagging high-beta symbols
+- ⚡ **Funding Exhaustion** - Trade sentiment extremes
+
+**What You Get:**
+- Real-time long/short opportunity detection
+- Confidence scores (60-100%)
+- Risk levels (LOW/MEDIUM/HIGH/VERY_HIGH)
+- Clear reasoning for each signal
+- Discord integration for instant alerts
+
+**Setup:** See [`docs/DIRECTIONAL_ALERTS.md`](docs/DIRECTIONAL_ALERTS.md) for complete guide
 
 ---
 
@@ -140,7 +160,7 @@ crypto-perps-tracker/
 ├── scripts/
 │   ├── compare_all_exchanges.py      # Main comparison script (8 exchanges)
 │   ├── generate_market_report.py     # Comprehensive market analysis & report
-│   ├── send_discord_report.py        # Discord webhook integration
+│   ├── market_report.py        # Discord webhook integration
 │   ├── schedule_discord_reports.sh   # Automation scheduler for Discord
 │   ├── analyze_coins.py              # Per-coin analysis (BTC, ETH, SOL)
 │   ├── fetch_bitget.py              # Individual exchange fetchers

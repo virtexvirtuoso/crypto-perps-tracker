@@ -32,7 +32,7 @@ send_reports() {
 
     # Run the Market Report
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Generating Market Report..." >> "$LOG_FILE"
-    $PYTHON scripts/send_discord_report.py >> "$LOG_FILE" 2>&1
+    $PYTHON scripts/market_report.py >> "$LOG_FILE" 2>&1
     MARKET_STATUS=$?
 
     if [ $MARKET_STATUS -eq 0 ]; then

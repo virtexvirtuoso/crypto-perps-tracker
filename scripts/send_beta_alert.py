@@ -8,8 +8,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load environment variables first
+from dotenv import load_dotenv
+load_dotenv()
+
 from generate_symbol_report import (
-    fetch_symbol_data_from_exchanges,
+    fetch_all_symbols_from_exchanges,
     analyze_symbol
 )
 import requests
@@ -24,13 +28,13 @@ import matplotlib.dates as mdates
 import time
 
 
-def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 24) -> Dict[str, List[Dict]]:
+def fetch_historical_data_for_symbols(symbols: List[str], limit: int = 12) -> Dict[str, List[Dict]]:
     """
     Fetch hourly historical OHLCV data for specified symbols from OKX
 
     Args:
         symbols: List of symbol names (e.g., ['BTC', 'ETH', 'SOL'])
-        limit: Number of hourly candles to fetch (default 24 for 24 hours)
+        limit: Number of hourly candles to fetch (default 12 for 12 hours)
 
     Returns:
         Dict mapping symbol -> list of {timestamp, open, high, low, close, volume}
@@ -128,10 +132,15 @@ def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, 
     # Create beta lookup
     beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
 
-    # Create figure
+    # Create figure with default color cycle
     fig, ax = plt.subplots(figsize=(16, 10))
 
+    # Use matplotlib's tab10 color cycle for distinct colors
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
+
     # Plot each symbol
+    color_idx = 0
     for symbol, candles in historical_data.items():
         if not candles:
             continue
@@ -141,36 +150,33 @@ def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, 
         timestamps = [datetime.fromtimestamp(c['timestamp'] / 1000) for c in candles]
         percent_changes = [((c['close'] - initial_price) / initial_price) * 100 for c in candles]
 
-        # Get beta and color
-        beta = beta_lookup.get(symbol, 1.0)
-        color = get_beta_color(beta)
+        # Use color from matplotlib's default cycle
+        color = colors[color_idx % len(colors)]
         linewidth = 4 if symbol == 'BTC' else 2
         alpha = 1.0 if symbol == 'BTC' else 0.7
 
-        # Plot line
-        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
-                alpha=alpha, label=symbol if symbol == 'BTC' else None)
+        # Calculate final percentage for legend
+        final_pct = percent_changes[-1]
+        legend_label = f"{symbol} ({final_pct:+.1f}%)"
 
-        # Add label at the end
-        if timestamps and percent_changes:
-            ax.text(timestamps[-1], percent_changes[-1], f'  {symbol}',
-                   va='center', ha='left', color=color, fontsize=10,
-                   fontweight='bold' if symbol == 'BTC' else 'normal',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#0a0a0a',
-                            edgecolor=color, alpha=0.8, linewidth=1))
+        # Plot line with symbol name and percentage in legend
+        ax.plot(timestamps, percent_changes, color=color, linewidth=linewidth,
+                alpha=alpha, label=legend_label)
+
+        color_idx += 1
 
     # Zero line
     ax.axhline(y=0, color='#888888', linestyle='-', linewidth=2, alpha=0.6)
 
     # Formatting
-    ax.set_xlabel('Time (24h Period)', fontsize=14, fontweight='bold', color='#FFD700')
+    ax.set_xlabel('Time (12h Period)', fontsize=14, fontweight='bold', color='#FFD700')
     ax.set_ylabel('Price Change (%)', fontsize=14, fontweight='bold', color='#FFD700')
-    ax.set_title('₿ BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (24h)',
+    ax.set_title('BITCOIN BETA ANALYSIS\nIndividual Symbol Movements vs Bitcoin (12h)',
                 fontsize=18, fontweight='bold', color='#FFA500', pad=20)
 
     # Format x-axis
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
     fig.autofmt_xdate()
 
     # Grid and styling
@@ -179,9 +185,11 @@ def generate_time_series_chart(analyses: List[Dict], historical_data: Dict[str, 
     ax.set_facecolor('#0a0a0a')
     fig.patch.set_facecolor('#0a0a0a')
 
-    # Legend
+    # Legend on the right side
     if ax.get_legend_handles_labels()[0]:
-        legend = ax.legend(fontsize=12, framealpha=0.9, loc='upper left')
+        legend = ax.legend(fontsize=10, framealpha=0.9,
+                          loc='center left', bbox_to_anchor=(1.01, 0.5),
+                          borderaxespad=0)
         plt.setp(legend.get_texts(), color='#FFD700')
         legend.get_frame().set_facecolor('#1a1a1a')
         legend.get_frame().set_edgecolor('#FFA500')
@@ -240,7 +248,7 @@ def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, hi
             "color": 0xFFA500,  # Amber
             "fields": [],
             "footer": {
-                "text": "Beta = Symbol 24h Change / BTC 24h Change • Time-series shows 24h price movements"
+                "text": "Beta = Symbol 12h Change / BTC 12h Change • Time-series shows 12h price movements"
             },
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -316,17 +324,24 @@ def send_beta_alert_to_discord(analyses: List[Dict], btc_price_change: float, hi
 
 if __name__ == "__main__":
     print("\n🚀 Bitcoin Beta Alert Generator\n")
-    print("⏳ Fetching data from 8 exchanges (30-40 seconds)...\n")
+    print("⏳ Fetching data from exchanges (30-40 seconds)...\n")
+
+    # Initialize Container
+    from src.models.config import Config
+    from src.container import Container
+
+    config = Config.from_yaml('config/config.yaml')
+    container = Container(config)
 
     # Fetch data
-    symbol_data = fetch_symbol_data_from_exchanges()
+    symbol_data = fetch_all_symbols_from_exchanges(container)
     print(f"✅ Collected data for {len(symbol_data)} symbols\n")
 
-    # Get BTC price change
+    # Get BTC price change (from SymbolData objects)
     btc_data = symbol_data.get('BTC', [])
     btc_price_change = None
     if btc_data:
-        btc_changes = [d.get('price_change_pct') for d in btc_data if d.get('price_change_pct') is not None]
+        btc_changes = [d.price_change_24h_pct for d in btc_data if d.price_change_24h_pct is not None]
         if btc_changes:
             btc_price_change = sum(btc_changes) / len(btc_changes)
             print(f"📊 BTC 24h change: {btc_price_change:+.2f}%\n")
@@ -344,10 +359,10 @@ if __name__ == "__main__":
     print(f"✅ Analyzed {len(analyses)} symbols\n")
 
     # Fetch historical data for top 25 symbols (including BTC)
-    print("📈 Fetching historical price data for top 25 symbols...\n")
+    print("📈 Fetching 12h historical price data for top 25 symbols...\n")
     top_symbols = ['BTC'] + [a['symbol'] for a in analyses[:24] if a['symbol'] != 'BTC']
-    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=24)
-    print(f"\n✅ Fetched historical data for {len(historical_data)} symbols\n")
+    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=12)
+    print(f"\n✅ Fetched 12h historical data for {len(historical_data)} symbols\n")
 
     # Send to Discord
     webhook_url = "https://discord.com/api/webhooks/1430641654846459964/QQj9KDof3UNhDj-p3GyrVDDAX1rWjja6D8VfQ92wSaxdsqEot8VD2S_W8J9uQdLT-oR7"
