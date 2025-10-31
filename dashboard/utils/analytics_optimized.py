@@ -25,6 +25,7 @@ from scripts.generate_symbol_report import (
     fetch_historical_data_for_symbols,
     generate_bitcoin_beta_chart_timeseries
 )
+from dashboard.utils.db_hist_data import fetch_historical_data_from_db, get_database_stats
 
 
 @cached(ttl_seconds=120)
@@ -234,12 +235,22 @@ def get_performance_chart_plotly(container: Container, analyses: List[Dict], top
     # Get top symbols
     top_symbols = [a['symbol'] for a in analyses[:top_n]]
 
-    # Fetch 12h historical data
-    historical_data = fetch_historical_data_for_symbols(top_symbols, limit=12)
+    # Try to fetch from database first (fast!)
+    historical_data = fetch_historical_data_from_db(top_symbols, hours=12)
 
-    if not historical_data:
-        print("⚠️  No historical data available")
-        return None
+    # Check if we have enough data
+    db_stats = get_database_stats()
+
+    if not historical_data or db_stats.get('time_range_hours', 0) < 1:
+        # Fallback to API if database doesn't have enough data yet
+        print("⚠️  Database has insufficient data, using API fallback...")
+        historical_data = fetch_historical_data_for_symbols(top_symbols, limit=12)
+
+        if not historical_data:
+            print("⚠️  No historical data available from API either")
+            return None
+    else:
+        print(f"✅ Using database data ({db_stats['time_range_hours']:.1f}h available)")
 
     # Create beta lookup
     beta_lookup = {a['symbol']: a.get('btc_beta', 1.0) for a in analyses}
