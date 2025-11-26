@@ -1,0 +1,74 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+*.whl
+
+# Virtual environments
+venv/
+env/
+ENV/
+venv311/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# Data files (mount as volume instead)
+data/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests (not needed in production)
+tests/
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# Environment files (pass via docker-compose)
+.env
+.env.*
+!.env.example
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
+
+# Archives
+*.tar.gz
+*.zip
+
+# Deprecated scripts (not needed in production)
+scripts/deprecated/
+scripts/archived/

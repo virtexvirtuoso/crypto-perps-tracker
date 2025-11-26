@@ -1,0 +1,100 @@
+# Crypto Perps Tracker - Docker Compose Configuration
+# Run with: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Main Dashboard Service
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: crypto-perps-dashboard
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DASH_DEBUG=false
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8050', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - crypto-network
+
+  # Historical Data Logger Service
+  data-logger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: crypto-perps-data-logger
+    restart: unless-stopped
+    command: ["python", "scripts/historical_data_logger.py"]
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      - dashboard
+    networks:
+      - crypto-network
+
+  # Strategy Alerts Service (runs every 15 minutes via cron-like approach)
+  strategy-alerts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: crypto-perps-strategy-alerts
+    restart: unless-stopped
+    command: >
+      sh -c "while true; do
+        python scripts/strategy_alerts.py;
+        sleep 900;
+      done"
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      - dashboard
+    networks:
+      - crypto-network
+
+  # Redis for caching (optional, for advanced features)
+  redis:
+    image: redis:7-alpine
+    container_name: crypto-perps-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - crypto-network
+    profiles:
+      - with-redis
+
+networks:
+  crypto-network:
+    driver: bridge
+
+volumes:
+  redis-data:

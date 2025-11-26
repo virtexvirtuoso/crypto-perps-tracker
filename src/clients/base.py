@@ -3,8 +3,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import requests
-from src.models.market import MarketData, ExchangeType, SymbolData
 import time
+from src.models.market import MarketData, ExchangeType, SymbolData
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class BaseExchangeClient(ABC):
@@ -81,6 +84,7 @@ class BaseExchangeClient(ABC):
         """
         url = f"{self.base_url}{endpoint}"
         last_exception = None
+        start_time = time.perf_counter()
 
         for attempt in range(self.retry_attempts):
             try:
@@ -90,6 +94,14 @@ class BaseExchangeClient(ABC):
                     timeout=self.timeout
                 )
                 response.raise_for_status()
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                logger.debug(
+                    "API request completed",
+                    exchange=self.exchange_type.value,
+                    endpoint=endpoint,
+                    duration_ms=round(duration_ms, 2),
+                    status_code=response.status_code
+                )
                 return response.json()
 
             except requests.RequestException as e:
@@ -97,9 +109,25 @@ class BaseExchangeClient(ABC):
                 if attempt < self.retry_attempts - 1:
                     # Exponential backoff
                     delay = self.retry_delay * (2 ** attempt)
+                    logger.warning(
+                        "API request failed, retrying",
+                        exchange=self.exchange_type.value,
+                        endpoint=endpoint,
+                        attempt=attempt + 1,
+                        max_attempts=self.retry_attempts,
+                        retry_delay=delay,
+                        error=str(e)
+                    )
                     time.sleep(delay)
                 else:
                     # Last attempt failed
+                    logger.error(
+                        "API request failed after all retries",
+                        exchange=self.exchange_type.value,
+                        endpoint=endpoint,
+                        attempts=self.retry_attempts,
+                        error=str(e)
+                    )
                     raise
 
         # Should never reach here, but just in case
@@ -121,6 +149,7 @@ class BaseExchangeClient(ABC):
         """
         url = f"{self.base_url}{endpoint}"
         last_exception = None
+        start_time = time.perf_counter()
 
         for attempt in range(self.retry_attempts):
             try:
@@ -131,6 +160,14 @@ class BaseExchangeClient(ABC):
                     timeout=self.timeout
                 )
                 response.raise_for_status()
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                logger.debug(
+                    "API POST request completed",
+                    exchange=self.exchange_type.value,
+                    endpoint=endpoint,
+                    duration_ms=round(duration_ms, 2),
+                    status_code=response.status_code
+                )
                 return response.json()
 
             except requests.RequestException as e:
@@ -138,9 +175,25 @@ class BaseExchangeClient(ABC):
                 if attempt < self.retry_attempts - 1:
                     # Exponential backoff
                     delay = self.retry_delay * (2 ** attempt)
+                    logger.warning(
+                        "API POST request failed, retrying",
+                        exchange=self.exchange_type.value,
+                        endpoint=endpoint,
+                        attempt=attempt + 1,
+                        max_attempts=self.retry_attempts,
+                        retry_delay=delay,
+                        error=str(e)
+                    )
                     time.sleep(delay)
                 else:
                     # Last attempt failed
+                    logger.error(
+                        "API POST request failed after all retries",
+                        exchange=self.exchange_type.value,
+                        endpoint=endpoint,
+                        attempts=self.retry_attempts,
+                        error=str(e)
+                    )
                     raise
 
         # Should never reach here, but just in case

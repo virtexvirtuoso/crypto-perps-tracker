@@ -4,11 +4,15 @@ This service provides high-level operations for fetching and aggregating
 data from multiple exchanges with caching support.
 """
 
+import time
 from typing import List, Optional, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.clients.factory import ClientFactory
 from src.utils.cache import TTLCache
+from src.utils.logging import get_logger, PerformanceMetrics
 from src.models.market import MarketData, ExchangeType, SymbolData
+
+logger = get_logger(__name__)
 
 
 class ExchangeService:
@@ -108,6 +112,10 @@ class ExchangeService:
 
         # Cache miss - fetch from all exchanges in parallel
         results = []
+        metrics = PerformanceMetrics("fetch_all_markets", logger)
+
+        logger.info("Fetching data from all exchanges", exchange_count=len(self.clients))
+        start_time = time.perf_counter()
 
         # Use ThreadPoolExecutor for parallel fetching
         with ThreadPoolExecutor(max_workers=len(self.clients)) as executor:
@@ -120,15 +128,36 @@ class ExchangeService:
             # Collect results as they complete
             for future in as_completed(future_to_exchange):
                 exchange = future_to_exchange[future]
+                exchange_start = time.perf_counter()
                 try:
                     data = future.result()
                     # Filter blacklisted symbols
                     filtered_data = self._filter_blacklisted_symbols(data)
                     results.append(filtered_data)
+                    metrics.record(
+                        exchange,
+                        time.perf_counter() - exchange_start,
+                        success=True,
+                        volume=data.volume_24h
+                    )
                 except Exception as e:
                     # Log error but continue with other exchanges
-                    print(f"Warning: Failed to fetch {exchange}: {e}")
+                    logger.warning(
+                        "Failed to fetch exchange data",
+                        exchange=exchange,
+                        error=str(e)
+                    )
+                    metrics.record(exchange, time.perf_counter() - exchange_start, success=False)
                     continue
+
+        total_duration = time.perf_counter() - start_time
+        logger.info(
+            "Completed fetching all exchanges",
+            successful=len(results),
+            failed=len(self.clients) - len(results),
+            duration_ms=round(total_duration * 1000, 2)
+        )
+        metrics.log_summary()
 
         # Cache results
         if use_cache and results:
@@ -169,6 +198,7 @@ class ExchangeService:
             return None
 
         try:
+            start_time = time.perf_counter()
             data = client.fetch_volume()
 
             # Filter blacklisted symbols
@@ -178,9 +208,15 @@ class ExchangeService:
             if use_cache:
                 self.cache.set(cache_key, filtered_data)
 
+            logger.debug(
+                "Fetched exchange data",
+                exchange=exchange,
+                duration_ms=round((time.perf_counter() - start_time) * 1000, 2),
+                volume=data.volume_24h
+            )
             return filtered_data
         except Exception as e:
-            print(f"Error fetching {exchange}: {e}")
+            logger.error("Error fetching exchange", exchange=exchange, error=str(e))
             return None
 
     def get_total_volume(self, use_cache: bool = True) -> float:
