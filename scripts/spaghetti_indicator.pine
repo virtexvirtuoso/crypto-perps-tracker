@@ -1,0 +1,1030 @@
+//@version=5
+// Spaghetti Performance Indicator
+// Compares multiple assets relative to the chart's main symbol
+// Shows which assets are outperforming or underperforming
+indicator("Multi-Asset Spaghetti", shorttitle="Spaghetti", overlay=true, max_labels_count=500)
+
+// ============================================
+// TIME SETTINGS
+// ============================================
+string gTime = "Time Settings"
+string modeInput = input.string("Rolling", "Lookback Mode", options=["Rolling", "Anchor Date", "Zoom (Visible)"], group=gTime)
+int lookbackInput = input.int(360, "Rolling Bars Lookback", minval=1, maxval=1000, group=gTime)
+int timezoneOffset = input.int(0, "Your Timezone in UTC", minval=-12, maxval=14, group=gTime)
+int anchorYear = input.int(2025, "Year", minval=2020, maxval=2030, group=gTime)
+int anchorMonth = input.int(1, "Month", minval=1, maxval=12, group=gTime)
+int anchorDay = input.int(1, "Day", minval=1, maxval=31, group=gTime)
+int anchorHour = input.int(0, "Hours", minval=0, maxval=23, inline="time", group=gTime)
+int anchorMinute = input.int(0, "Minutes", minval=0, maxval=59, inline="time", group=gTime)
+int anchorSecond = input.int(0, "Seconds", minval=0, maxval=59, inline="time", group=gTime)
+
+// Calculate anchor timestamp
+int anchorTime = timestamp(anchorYear, anchorMonth, anchorDay, anchorHour, anchorMinute, anchorSecond) - (timezoneOffset * 60 * 60 * 1000)
+
+// ============================================
+// TABLE SETTINGS
+// ============================================
+string gTable = "Table Settings"
+string tablePosition = input.string("Top Right", "Screen Location", options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"], group=gTable)
+bool showTable = input.bool(true, "Show Performance Table", group=gTable)
+float highlightPct = input.float(5.0, "Percentage of Assets Highlighted", minval=1.0, maxval=50.0, group=gTable, tooltip="Only top/bottom X% will be fully visible")
+string displayType = input.string("All Assets", "Display Type", options=["All Assets", "Outliers Only", "Leaders Only", "Laggards Only"], group=gTable)
+int clusteredTransparency = input.int(80, "Clustered Assets Transparency", minval=0, maxval=100, group=gTable)
+color tableTextColor = input.color(color.white, "Table Text Color", group=gTable)
+
+// ============================================
+// LABEL SETTINGS
+// ============================================
+string gLabel = "Label Settings"
+int initialLabelOffset = input.int(5, "Initial Label Offset", minval=1, maxval=50, group=gLabel)
+int minDynamicOffset = input.int(5, "Minimum Dynamic Label Offset", minval=1, maxval=20, group=gLabel)
+int maxDynamicOffset = input.int(20, "Maximum Dynamic Label Offset", minval=5, maxval=100, group=gLabel)
+bool showZeroLine = input.bool(true, "Show Zero Line", group=gLabel)
+bool showEndLabels = input.bool(true, "Show End Labels", group=gLabel)
+int lineWidth = input.int(2, "Line Width", minval=1, maxval=4, group=gLabel)
+
+// ============================================
+// DISPLAY SETTINGS
+// ============================================
+string gDisplay = "Display Settings"
+bool relativeMode = input.bool(true, "Relative to Chart Symbol", group=gDisplay, tooltip="Compare all assets relative to the chart's main symbol. Shows outperformance/underperformance.")
+bool autoDim = input.bool(true, "Auto-Dim Clustered Assets", group=gDisplay)
+float dimThreshold = input.float(1.0, "Dim Threshold (Std Dev)", minval=0.5, maxval=3.0, group=gDisplay)
+bool showBands = input.bool(true, "Show Std Dev Bands", group=gDisplay)
+bool showMeanLine = input.bool(true, "Show Mean Line", group=gDisplay)
+
+// ============================================
+// ALERT SETTINGS
+// ============================================
+string gAlert = "Alert Settings"
+bool enableAlerts = input.bool(true, "Enable Alerts", group=gAlert)
+float breakoutThreshold = input.float(5.0, "Breakout Threshold (%)", minval=1.0, maxval=50.0, group=gAlert)
+float divergenceThreshold = input.float(10.0, "Divergence Threshold (%)", minval=2.0, maxval=50.0, group=gAlert)
+float spreadThreshold = input.float(20.0, "Spread Alert Threshold (%)", minval=5.0, maxval=100.0, group=gAlert)
+int alertCooldown = input.int(5, "Alert Cooldown (bars)", minval=1, maxval=50, group=gAlert)
+bool showBreakoutLabels = input.bool(true, "Show Breakout Labels", group=gAlert)
+bool showDivergenceLabels = input.bool(true, "Show Divergence Labels", group=gAlert)
+
+// ============================================
+// SYMBOL INPUTS (32 symbols - near Pine limit of 40)
+// ============================================
+string g1 = "Symbols Group 1"
+string sym01 = input.symbol("BINANCE:BTCUSDT.P", "Symbol 01", group=g1)
+string sym02 = input.symbol("BINANCE:ETHUSDT.P", "Symbol 02", group=g1)
+string sym03 = input.symbol("BINANCE:XRPUSDT.P", "Symbol 03", group=g1)
+string sym04 = input.symbol("BINANCE:BNBUSDT.P", "Symbol 04", group=g1)
+string sym05 = input.symbol("BINANCE:SOLUSDT.P", "Symbol 05", group=g1)
+string sym06 = input.symbol("BINANCE:DOGEUSDT.P", "Symbol 06", group=g1)
+string sym07 = input.symbol("BINANCE:AVAXUSDT.P", "Symbol 07", group=g1)
+string sym08 = input.symbol("BINANCE:LINKUSDT.P", "Symbol 08", group=g1)
+
+string g2 = "Symbols Group 2"
+string sym09 = input.symbol("BINANCE:TNSRUSDT.P", "Symbol 09", group=g2)
+string sym10 = input.symbol("BINANCE:ZECUSDT.P", "Symbol 10", group=g2)
+string sym11 = input.symbol("BINANCE:XMRUSDT.P", "Symbol 11", group=g2)
+string sym12 = input.symbol("BINANCE:ICPUSDT.P", "Symbol 12", group=g2)
+string sym13 = input.symbol("BINANCE:TRXUSDT.P", "Symbol 13", group=g2)
+string sym14 = input.symbol("BINANCE:LTCUSDT.P", "Symbol 14", group=g2)
+string sym15 = input.symbol("BINANCE:KASUSDT.P", "Symbol 15", group=g2)
+string sym16 = input.symbol("BINANCE:ETCUSDT.P", "Symbol 16", group=g2)
+
+string g3 = "Symbols Group 3"
+string sym17 = input.symbol("BINANCE:NEARUSDT.P", "Symbol 17", group=g3)
+string sym18 = input.symbol("BINANCE:ATOMUSDT.P", "Symbol 18", group=g3)
+string sym19 = input.symbol("BINANCE:GRASSUSDT.P", "Symbol 19", group=g3)
+string sym20 = input.symbol("BINANCE:HYPEUSDT.P", "Symbol 20", group=g3)
+string sym21 = input.symbol("BINANCE:WLDUSDT.P", "Symbol 21", group=g3)
+string sym22 = input.symbol("BINANCE:ONDOUSDT.P", "Symbol 22", group=g3)
+string sym23 = input.symbol("BINANCE:FARTCOINUSDT.P", "Symbol 23", group=g3)
+string sym24 = input.symbol("BINANCE:PIPPINUSDT.P", "Symbol 24", group=g3)
+
+string g4 = "Symbols Group 4"
+string sym25 = input.symbol("BINANCE:PIEVERSEUSDT.P", "Symbol 25", group=g4)
+string sym26 = input.symbol("BINANCE:JELLYJELLYUSDT.P", "Symbol 26", group=g4)
+string sym27 = input.symbol("BINANCE:EDENUSDT.P", "Symbol 27", group=g4)
+string sym28 = input.symbol("BINANCE:TAKEUSDT.P", "Symbol 28", group=g4)
+string sym29 = input.symbol("BINANCE:MYXUSDT.P", "Symbol 29", group=g4)
+string sym30 = input.symbol("BINANCE:OGUSDT.P", "Symbol 30", group=g4)
+string sym31 = input.symbol("BINANCE:FFUSDT.P", "Symbol 31", group=g4)
+string sym32 = input.symbol("BINANCE:XPINUSDT.P", "Symbol 32", group=g4)
+
+// ============================================
+// COLOR PALETTE (Customizable)
+// ============================================
+string gColors = "Colors"
+color c01 = input.color(#F7931A, "C1", inline="c1", group=gColors)   // BTC Orange
+color c02 = input.color(#627EEA, "C2", inline="c1", group=gColors)   // ETH Blue
+color c03 = input.color(#0088CC, "C3", inline="c1", group=gColors)   // XRP Blue
+color c04 = input.color(#F3BA2F, "C4", inline="c1", group=gColors)   // BNB Yellow
+color c05 = input.color(#9945FF, "C5", inline="c1", group=gColors)   // SOL Purple
+color c06 = input.color(#C2A633, "C6", inline="c1", group=gColors)   // DOGE Gold
+color c07 = input.color(#E84142, "C7", inline="c1", group=gColors)   // AVAX Red
+color c08 = input.color(#2A5ADA, "C8", inline="c2", group=gColors)   // LINK Blue
+color c09 = input.color(#00D1B2, "C9", inline="c2", group=gColors)   // Teal
+color c10 = input.color(#ECB244, "C10", inline="c2", group=gColors)  // ZEC Gold
+color c11 = input.color(#FF6600, "C11", inline="c2", group=gColors)  // XMR Orange
+color c12 = input.color(#29ABE2, "C12", inline="c2", group=gColors)  // ICP Cyan
+color c13 = input.color(#FF0013, "C13", inline="c2", group=gColors)  // TRX Red
+color c14 = input.color(#345D9D, "C14", inline="c3", group=gColors)  // LTC Blue
+color c15 = input.color(#49EACB, "C15", inline="c3", group=gColors)  // KAS Mint
+color c16 = input.color(#328332, "C16", inline="c3", group=gColors)  // ETC Green
+color c17 = input.color(#00C08B, "C17", inline="c3", group=gColors)  // NEAR Green
+color c18 = input.color(#2E3148, "C18", inline="c3", group=gColors)  // ATOM Navy
+color c19 = input.color(#7CFC00, "C19", inline="c3", group=gColors)  // GRASS Lime
+color c20 = input.color(#FF69B4, "C20", inline="c4", group=gColors)  // HYPE Pink
+color c21 = input.color(#00BFFF, "C21", inline="c4", group=gColors)  // WLD Sky
+color c22 = input.color(#4169E1, "C22", inline="c4", group=gColors)  // ONDO Royal
+color c23 = input.color(#8B4513, "C23", inline="c4", group=gColors)  // FARTCOIN Brown
+color c24 = input.color(#DA70D6, "C24", inline="c4", group=gColors)  // PIPPIN Orchid
+color c25 = input.color(#FFD700, "C25", inline="c4", group=gColors)  // PIEVERSE Gold
+color c26 = input.color(#FF1493, "C26", inline="c5", group=gColors)  // JELLY Pink
+color c27 = input.color(#32CD32, "C27", inline="c5", group=gColors)  // EDEN Lime
+color c28 = input.color(#FF4500, "C28", inline="c5", group=gColors)  // TAKE OrangeRed
+color c29 = input.color(#9370DB, "C29", inline="c5", group=gColors)  // MYX Purple
+color c30 = input.color(#20B2AA, "C30", inline="c5", group=gColors)  // OG Teal
+color c31 = input.color(#DC143C, "C31", inline="c5", group=gColors)  // FF Crimson
+color c32 = input.color(#00CED1, "C32", inline="c6", group=gColors)  // XPIN Turquoise
+
+// Symbol names for alerts
+var string[] symNames = array.from("BINANCE:BTCUSDT.P", "BINANCE:ETHUSDT.P", "BINANCE:XRPUSDT.P", "BINANCE:BNBUSDT.P", "BINANCE:SOLUSDT.P", "BINANCE:DOGEUSDT.P", "BINANCE:AVAXUSDT.P", "BINANCE:LINKUSDT.P", "BINANCE:TNSRUSDT.P", "BINANCE:ZECUSDT.P", "BINANCE:XMRUSDT.P", "BINANCE:ICPUSDT.P", "BINANCE:TRXUSDT.P", "BINANCE:LTCUSDT.P", "BINANCE:KASUSDT.P", "BINANCE:ETCUSDT.P", "BINANCE:NEARUSDT.P", "BINANCE:ATOMUSDT.P", "BINANCE:GRASSUSDT.P", "BINANCE:HYPEUSDT.P", "BINANCE:WLDUSDT.P", "BINANCE:ONDOUSDT.P", "BINANCE:FARTCOINUSDT.P", "BINANCE:PIPPINUSDT.P", "BINANCE:PIEVERSEUSDT.P", "BINANCE:JELLYJELLYUSDT.P", "BINANCE:EDENUSDT.P", "BINANCE:TAKEUSDT.P", "BINANCE:MYXUSDT.P", "BINANCE:OGUSDT.P", "BINANCE:FFUSDT.P", "BINANCE:XPINUSDT.P")
+
+// Short ticker names for table and labels
+var string[] tickerNames = array.from("BTC", "ETH", "XRP", "BNB", "SOL", "DOGE", "AVAX", "LINK", "TNSR", "ZEC", "XMR", "ICP", "TRX", "LTC", "KAS", "ETC", "NEAR", "ATOM", "GRASS", "HYPE", "WLD", "ONDO", "FARTCOIN", "PIPPIN", "PIEVERSE", "JELLY", "EDEN", "TAKE", "MYX", "OG", "FF", "XPIN")
+
+// ============================================
+// FETCH PRICE DATA (with lookahead=off to prevent repainting)
+// ============================================
+float p01 = request.security(sym01, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p02 = request.security(sym02, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p03 = request.security(sym03, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p04 = request.security(sym04, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p05 = request.security(sym05, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p06 = request.security(sym06, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p07 = request.security(sym07, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p08 = request.security(sym08, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p09 = request.security(sym09, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p10 = request.security(sym10, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p11 = request.security(sym11, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p12 = request.security(sym12, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p13 = request.security(sym13, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p14 = request.security(sym14, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p15 = request.security(sym15, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p16 = request.security(sym16, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p17 = request.security(sym17, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p18 = request.security(sym18, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p19 = request.security(sym19, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p20 = request.security(sym20, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p21 = request.security(sym21, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p22 = request.security(sym22, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p23 = request.security(sym23, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p24 = request.security(sym24, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p25 = request.security(sym25, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p26 = request.security(sym26, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p27 = request.security(sym27, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p28 = request.security(sym28, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p29 = request.security(sym29, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p30 = request.security(sym30, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p31 = request.security(sym31, timeframe.period, close, lookahead=barmerge.lookahead_off)
+float p32 = request.security(sym32, timeframe.period, close, lookahead=barmerge.lookahead_off)
+
+// ============================================
+// RETURN CALCULATION FUNCTIONS
+// ============================================
+
+// Get base price based on mode
+// Note: ta.valuewhen must be called on every bar for consistency
+getBasePrice(float price, string mode, int lookback) =>
+    // Call ta.valuewhen unconditionally (required by Pine Script)
+    float anchorPrice = ta.valuewhen(time >= anchorTime and time[1] < anchorTime, price, 0)
+    float result = na
+    if mode == "Rolling"
+        result := price[lookback]
+    else if mode == "Anchor Date"
+        result := na(anchorPrice) ? price[lookback] : anchorPrice  // Use fallback if na
+    else if mode == "Zoom (Visible)"
+        // Use the visible range - approximated by using bar_index limited to max lookback
+        result := price[math.min(bar_index, 500)]
+    result
+
+// Calculate percentage return
+calcReturn(float price, float basePrice) =>
+    basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0.0
+
+// ============================================
+// CHART SYMBOL (for relative comparison)
+// ============================================
+float chartPrice = close
+float chartBase = getBasePrice(chartPrice, modeInput, lookbackInput)
+float chartReturn = calcReturn(chartPrice, chartBase)
+
+// ============================================
+// CALCULATE ALL RETURNS
+// ============================================
+base01 = getBasePrice(p01, modeInput, lookbackInput)
+base02 = getBasePrice(p02, modeInput, lookbackInput)
+base03 = getBasePrice(p03, modeInput, lookbackInput)
+base04 = getBasePrice(p04, modeInput, lookbackInput)
+base05 = getBasePrice(p05, modeInput, lookbackInput)
+base06 = getBasePrice(p06, modeInput, lookbackInput)
+base07 = getBasePrice(p07, modeInput, lookbackInput)
+base08 = getBasePrice(p08, modeInput, lookbackInput)
+base09 = getBasePrice(p09, modeInput, lookbackInput)
+base10 = getBasePrice(p10, modeInput, lookbackInput)
+base11 = getBasePrice(p11, modeInput, lookbackInput)
+base12 = getBasePrice(p12, modeInput, lookbackInput)
+base13 = getBasePrice(p13, modeInput, lookbackInput)
+base14 = getBasePrice(p14, modeInput, lookbackInput)
+base15 = getBasePrice(p15, modeInput, lookbackInput)
+base16 = getBasePrice(p16, modeInput, lookbackInput)
+base17 = getBasePrice(p17, modeInput, lookbackInput)
+base18 = getBasePrice(p18, modeInput, lookbackInput)
+base19 = getBasePrice(p19, modeInput, lookbackInput)
+base20 = getBasePrice(p20, modeInput, lookbackInput)
+base21 = getBasePrice(p21, modeInput, lookbackInput)
+base22 = getBasePrice(p22, modeInput, lookbackInput)
+base23 = getBasePrice(p23, modeInput, lookbackInput)
+base24 = getBasePrice(p24, modeInput, lookbackInput)
+base25 = getBasePrice(p25, modeInput, lookbackInput)
+base26 = getBasePrice(p26, modeInput, lookbackInput)
+base27 = getBasePrice(p27, modeInput, lookbackInput)
+base28 = getBasePrice(p28, modeInput, lookbackInput)
+base29 = getBasePrice(p29, modeInput, lookbackInput)
+base30 = getBasePrice(p30, modeInput, lookbackInput)
+base31 = getBasePrice(p31, modeInput, lookbackInput)
+base32 = getBasePrice(p32, modeInput, lookbackInput)
+
+// Calculate raw returns
+float rawRet01 = calcReturn(p01, base01)
+float rawRet02 = calcReturn(p02, base02)
+float rawRet03 = calcReturn(p03, base03)
+float rawRet04 = calcReturn(p04, base04)
+float rawRet05 = calcReturn(p05, base05)
+float rawRet06 = calcReturn(p06, base06)
+float rawRet07 = calcReturn(p07, base07)
+float rawRet08 = calcReturn(p08, base08)
+float rawRet09 = calcReturn(p09, base09)
+float rawRet10 = calcReturn(p10, base10)
+float rawRet11 = calcReturn(p11, base11)
+float rawRet12 = calcReturn(p12, base12)
+float rawRet13 = calcReturn(p13, base13)
+float rawRet14 = calcReturn(p14, base14)
+float rawRet15 = calcReturn(p15, base15)
+float rawRet16 = calcReturn(p16, base16)
+float rawRet17 = calcReturn(p17, base17)
+float rawRet18 = calcReturn(p18, base18)
+float rawRet19 = calcReturn(p19, base19)
+float rawRet20 = calcReturn(p20, base20)
+float rawRet21 = calcReturn(p21, base21)
+float rawRet22 = calcReturn(p22, base22)
+float rawRet23 = calcReturn(p23, base23)
+float rawRet24 = calcReturn(p24, base24)
+float rawRet25 = calcReturn(p25, base25)
+float rawRet26 = calcReturn(p26, base26)
+float rawRet27 = calcReturn(p27, base27)
+float rawRet28 = calcReturn(p28, base28)
+float rawRet29 = calcReturn(p29, base29)
+float rawRet30 = calcReturn(p30, base30)
+float rawRet31 = calcReturn(p31, base31)
+float rawRet32 = calcReturn(p32, base32)
+
+// Apply relative mode: subtract chart symbol return to show outperformance/underperformance
+float relAdj = relativeMode ? chartReturn : 0.0
+float ret01 = rawRet01 - relAdj
+float ret02 = rawRet02 - relAdj
+float ret03 = rawRet03 - relAdj
+float ret04 = rawRet04 - relAdj
+float ret05 = rawRet05 - relAdj
+float ret06 = rawRet06 - relAdj
+float ret07 = rawRet07 - relAdj
+float ret08 = rawRet08 - relAdj
+float ret09 = rawRet09 - relAdj
+float ret10 = rawRet10 - relAdj
+float ret11 = rawRet11 - relAdj
+float ret12 = rawRet12 - relAdj
+float ret13 = rawRet13 - relAdj
+float ret14 = rawRet14 - relAdj
+float ret15 = rawRet15 - relAdj
+float ret16 = rawRet16 - relAdj
+float ret17 = rawRet17 - relAdj
+float ret18 = rawRet18 - relAdj
+float ret19 = rawRet19 - relAdj
+float ret20 = rawRet20 - relAdj
+float ret21 = rawRet21 - relAdj
+float ret22 = rawRet22 - relAdj
+float ret23 = rawRet23 - relAdj
+float ret24 = rawRet24 - relAdj
+float ret25 = rawRet25 - relAdj
+float ret26 = rawRet26 - relAdj
+float ret27 = rawRet27 - relAdj
+float ret28 = rawRet28 - relAdj
+float ret29 = rawRet29 - relAdj
+float ret30 = rawRet30 - relAdj
+float ret31 = rawRet31 - relAdj
+float ret32 = rawRet32 - relAdj
+
+// ============================================
+// AUTO-DIMMING LOGIC
+// ============================================
+float[] retArray = array.from(ret01, ret02, ret03, ret04, ret05, ret06, ret07, ret08, ret09, ret10, ret11, ret12, ret13, ret14, ret15, ret16, ret17, ret18, ret19, ret20, ret21, ret22, ret23, ret24, ret25, ret26, ret27, ret28, ret29, ret30, ret31, ret32)
+
+float meanRet = array.avg(retArray)
+float stdRet = array.stdev(retArray)
+float maxRet = array.max(retArray)
+float minRet = array.min(retArray)
+float spreadRet = maxRet - minRet
+
+// Calculate percentile thresholds for highlighting
+int numAssets = 32
+int numHighlight = math.round(numAssets * (highlightPct / 100))
+float[] sortedRets = array.copy(retArray)
+array.sort(sortedRets, order.descending)
+float topThreshold = array.get(sortedRets, math.max(0, numHighlight - 1))
+float bottomThreshold = array.get(sortedRets, math.min(31, 32 - numHighlight))
+
+// ============================================
+// DYNAMIC PLOT ASSIGNMENT (20 slots for 32 symbols)
+// Assigns top 10 and bottom 10 performers to fixed plot slots
+// This keeps us under TradingView's 64 plot limit
+// ============================================
+
+// Create sorted index array to find top/bottom performers
+int[] sortedIndices = array.new_int(32)
+for i = 0 to 31
+    array.set(sortedIndices, i, i)
+
+// Sort indices by return value (descending)
+for i = 0 to 30
+    for j = 0 to 30 - i
+        int idxJ = array.get(sortedIndices, j)
+        int idxJ1 = array.get(sortedIndices, j + 1)
+        if array.get(retArray, idxJ) < array.get(retArray, idxJ1)
+            array.set(sortedIndices, j, idxJ1)
+            array.set(sortedIndices, j + 1, idxJ)
+
+// Get indices for top 10 and bottom 10 performers
+var int[] topIndices = array.new_int(10, 0)
+var int[] bottomIndices = array.new_int(10, 0)
+for i = 0 to 9
+    array.set(topIndices, i, array.get(sortedIndices, i))           // Top 10
+    array.set(bottomIndices, i, array.get(sortedIndices, 31 - i))   // Bottom 10
+
+// Helper function: get return value by index
+getRetByIdx(int idx) =>
+    switch idx
+        0 => ret01
+        1 => ret02
+        2 => ret03
+        3 => ret04
+        4 => ret05
+        5 => ret06
+        6 => ret07
+        7 => ret08
+        8 => ret09
+        9 => ret10
+        10 => ret11
+        11 => ret12
+        12 => ret13
+        13 => ret14
+        14 => ret15
+        15 => ret16
+        16 => ret17
+        17 => ret18
+        18 => ret19
+        19 => ret20
+        20 => ret21
+        21 => ret22
+        22 => ret23
+        23 => ret24
+        24 => ret25
+        25 => ret26
+        26 => ret27
+        27 => ret28
+        28 => ret29
+        29 => ret30
+        30 => ret31
+        => ret32
+
+// Helper function: get color by index
+getColorByIdx(int idx) =>
+    switch idx
+        0 => c01
+        1 => c02
+        2 => c03
+        3 => c04
+        4 => c05
+        5 => c06
+        6 => c07
+        7 => c08
+        8 => c09
+        9 => c10
+        10 => c11
+        11 => c12
+        12 => c13
+        13 => c14
+        14 => c15
+        15 => c16
+        16 => c17
+        17 => c18
+        18 => c19
+        19 => c20
+        20 => c21
+        21 => c22
+        22 => c23
+        23 => c24
+        24 => c25
+        25 => c26
+        26 => c27
+        27 => c28
+        28 => c29
+        29 => c30
+        30 => c31
+        => c32
+
+// Get dynamic values for top 10 slots
+float topVal01 = getRetByIdx(array.get(topIndices, 0))
+float topVal02 = getRetByIdx(array.get(topIndices, 1))
+float topVal03 = getRetByIdx(array.get(topIndices, 2))
+float topVal04 = getRetByIdx(array.get(topIndices, 3))
+float topVal05 = getRetByIdx(array.get(topIndices, 4))
+float topVal06 = getRetByIdx(array.get(topIndices, 5))
+float topVal07 = getRetByIdx(array.get(topIndices, 6))
+float topVal08 = getRetByIdx(array.get(topIndices, 7))
+float topVal09 = getRetByIdx(array.get(topIndices, 8))
+float topVal10 = getRetByIdx(array.get(topIndices, 9))
+
+// Get dynamic values for bottom 10 slots
+float botVal01 = getRetByIdx(array.get(bottomIndices, 0))
+float botVal02 = getRetByIdx(array.get(bottomIndices, 1))
+float botVal03 = getRetByIdx(array.get(bottomIndices, 2))
+float botVal04 = getRetByIdx(array.get(bottomIndices, 3))
+float botVal05 = getRetByIdx(array.get(bottomIndices, 4))
+float botVal06 = getRetByIdx(array.get(bottomIndices, 5))
+float botVal07 = getRetByIdx(array.get(bottomIndices, 6))
+float botVal08 = getRetByIdx(array.get(bottomIndices, 7))
+float botVal09 = getRetByIdx(array.get(bottomIndices, 8))
+float botVal10 = getRetByIdx(array.get(bottomIndices, 9))
+
+// Get dynamic colors for top 10 slots
+color topCol01 = getColorByIdx(array.get(topIndices, 0))
+color topCol02 = getColorByIdx(array.get(topIndices, 1))
+color topCol03 = getColorByIdx(array.get(topIndices, 2))
+color topCol04 = getColorByIdx(array.get(topIndices, 3))
+color topCol05 = getColorByIdx(array.get(topIndices, 4))
+color topCol06 = getColorByIdx(array.get(topIndices, 5))
+color topCol07 = getColorByIdx(array.get(topIndices, 6))
+color topCol08 = getColorByIdx(array.get(topIndices, 7))
+color topCol09 = getColorByIdx(array.get(topIndices, 8))
+color topCol10 = getColorByIdx(array.get(topIndices, 9))
+
+// Get dynamic colors for bottom 10 slots
+color botCol01 = getColorByIdx(array.get(bottomIndices, 0))
+color botCol02 = getColorByIdx(array.get(bottomIndices, 1))
+color botCol03 = getColorByIdx(array.get(bottomIndices, 2))
+color botCol04 = getColorByIdx(array.get(bottomIndices, 3))
+color botCol05 = getColorByIdx(array.get(bottomIndices, 4))
+color botCol06 = getColorByIdx(array.get(bottomIndices, 5))
+color botCol07 = getColorByIdx(array.get(bottomIndices, 6))
+color botCol08 = getColorByIdx(array.get(bottomIndices, 7))
+color botCol09 = getColorByIdx(array.get(bottomIndices, 8))
+color botCol10 = getColorByIdx(array.get(bottomIndices, 9))
+
+// Function to determine if return is in the "clustered middle"
+isMiddle(float ret) =>
+    autoDim and math.abs(ret - meanRet) < (stdRet * dimThreshold)
+
+// Check if asset is a top performer (highlighted)
+isTopPerformer(float ret) =>
+    ret >= topThreshold
+
+// Check if asset is a bottom performer (highlighted)
+isBottomPerformer(float ret) =>
+    ret <= bottomThreshold
+
+// Check if asset should be visible based on display type
+shouldDisplay(float ret) =>
+    if displayType == "All Assets"
+        true
+    else if displayType == "Outliers Only"
+        isTopPerformer(ret) or isBottomPerformer(ret)
+    else if displayType == "Leaders Only"
+        isTopPerformer(ret)
+    else if displayType == "Laggards Only"
+        isBottomPerformer(ret)
+    else
+        true
+
+// Adjust transparency for middle performers
+getAlpha(float ret) =>
+    if not shouldDisplay(ret)
+        0  // Completely hidden
+    else if isTopPerformer(ret) or isBottomPerformer(ret)
+        100  // Fully visible for outliers
+    else if isMiddle(ret)
+        100 - clusteredTransparency  // Use configured transparency
+    else
+        100  // Fully visible
+
+// ============================================
+// BREAKOUT DETECTION
+// ============================================
+// Calculate bar-over-bar change for each asset
+float change01 = ret01 - nz(ret01[1])
+float change02 = ret02 - nz(ret02[1])
+float change03 = ret03 - nz(ret03[1])
+float change04 = ret04 - nz(ret04[1])
+float change05 = ret05 - nz(ret05[1])
+float change06 = ret06 - nz(ret06[1])
+float change07 = ret07 - nz(ret07[1])
+float change08 = ret08 - nz(ret08[1])
+float change09 = ret09 - nz(ret09[1])
+float change10 = ret10 - nz(ret10[1])
+float change11 = ret11 - nz(ret11[1])
+float change12 = ret12 - nz(ret12[1])
+float change13 = ret13 - nz(ret13[1])
+float change14 = ret14 - nz(ret14[1])
+float change15 = ret15 - nz(ret15[1])
+float change16 = ret16 - nz(ret16[1])
+float change17 = ret17 - nz(ret17[1])
+float change18 = ret18 - nz(ret18[1])
+float change19 = ret19 - nz(ret19[1])
+float change20 = ret20 - nz(ret20[1])
+float change21 = ret21 - nz(ret21[1])
+float change22 = ret22 - nz(ret22[1])
+float change23 = ret23 - nz(ret23[1])
+float change24 = ret24 - nz(ret24[1])
+float change25 = ret25 - nz(ret25[1])
+float change26 = ret26 - nz(ret26[1])
+float change27 = ret27 - nz(ret27[1])
+float change28 = ret28 - nz(ret28[1])
+float change29 = ret29 - nz(ret29[1])
+float change30 = ret30 - nz(ret30[1])
+float change31 = ret31 - nz(ret31[1])
+float change32 = ret32 - nz(ret32[1])
+
+// Breakout detection function
+isBreakout(float change, float threshold) =>
+    math.abs(change) >= threshold
+
+// Track cooldown for alerts
+var int lastBreakoutBar = 0
+var int lastDivergenceBar = 0
+var int lastSpreadBar = 0
+
+bool canAlertBreakout = bar_index - lastBreakoutBar >= alertCooldown
+bool canAlertDivergence = bar_index - lastDivergenceBar >= alertCooldown
+bool canAlertSpread = bar_index - lastSpreadBar >= alertCooldown
+
+// Detect breakouts
+bool breakout01 = isBreakout(change01, breakoutThreshold)
+bool breakout02 = isBreakout(change02, breakoutThreshold)
+bool breakout03 = isBreakout(change03, breakoutThreshold)
+bool breakout04 = isBreakout(change04, breakoutThreshold)
+bool breakout05 = isBreakout(change05, breakoutThreshold)
+bool breakout06 = isBreakout(change06, breakoutThreshold)
+bool breakout07 = isBreakout(change07, breakoutThreshold)
+bool breakout08 = isBreakout(change08, breakoutThreshold)
+bool breakout09 = isBreakout(change09, breakoutThreshold)
+bool breakout10 = isBreakout(change10, breakoutThreshold)
+bool breakout11 = isBreakout(change11, breakoutThreshold)
+bool breakout12 = isBreakout(change12, breakoutThreshold)
+bool breakout13 = isBreakout(change13, breakoutThreshold)
+bool breakout14 = isBreakout(change14, breakoutThreshold)
+bool breakout15 = isBreakout(change15, breakoutThreshold)
+bool breakout16 = isBreakout(change16, breakoutThreshold)
+bool breakout17 = isBreakout(change17, breakoutThreshold)
+bool breakout18 = isBreakout(change18, breakoutThreshold)
+bool breakout19 = isBreakout(change19, breakoutThreshold)
+bool breakout20 = isBreakout(change20, breakoutThreshold)
+bool breakout21 = isBreakout(change21, breakoutThreshold)
+bool breakout22 = isBreakout(change22, breakoutThreshold)
+bool breakout23 = isBreakout(change23, breakoutThreshold)
+bool breakout24 = isBreakout(change24, breakoutThreshold)
+bool breakout25 = isBreakout(change25, breakoutThreshold)
+bool breakout26 = isBreakout(change26, breakoutThreshold)
+bool breakout27 = isBreakout(change27, breakoutThreshold)
+bool breakout28 = isBreakout(change28, breakoutThreshold)
+bool breakout29 = isBreakout(change29, breakoutThreshold)
+bool breakout30 = isBreakout(change30, breakoutThreshold)
+bool breakout31 = isBreakout(change31, breakoutThreshold)
+bool breakout32 = isBreakout(change32, breakoutThreshold)
+
+bool anyBreakout = breakout01 or breakout02 or breakout03 or breakout04 or breakout05 or breakout06 or breakout07 or breakout08 or
+                   breakout09 or breakout10 or breakout11 or breakout12 or breakout13 or breakout14 or breakout15 or breakout16 or
+                   breakout17 or breakout18 or breakout19 or breakout20 or breakout21 or breakout22 or breakout23 or breakout24 or
+                   breakout25 or breakout26 or breakout27 or breakout28 or breakout29 or breakout30 or breakout31 or breakout32
+
+// ============================================
+// DIVERGENCE DETECTION
+// ============================================
+// BTC (ret01) vs Altcoin average divergence
+float altcoinAvg = (ret02 + ret03 + ret04 + ret05 + ret06 + ret07 + ret08 + ret09 + ret10 + ret11 + ret12 + ret13 + ret14 + ret15 + ret16 + ret17 + ret18 + ret19 + ret20 + ret21 + ret22 + ret23 + ret24 + ret25 + ret26 + ret27 + ret28 + ret29 + ret30 + ret31 + ret32) / 31
+
+float btcAltDivergence = ret01 - altcoinAvg
+bool btcAltDivergenceAlert = math.abs(btcAltDivergence) >= divergenceThreshold
+
+// ETH vs BTC divergence (common pair trade)
+float ethBtcDivergence = ret02 - ret01
+bool ethBtcDivergenceAlert = math.abs(ethBtcDivergence) >= divergenceThreshold
+
+// Large cap vs small cap divergence
+float largeCap = (ret01 + ret02 + ret03 + ret04 + ret05) / 5  // BTC, ETH, XRP, BNB, SOL
+float smallCap = (ret23 + ret24 + ret25 + ret26 + ret27 + ret28 + ret29 + ret30 + ret31 + ret32) / 10
+float capDivergence = largeCap - smallCap
+bool capDivergenceAlert = math.abs(capDivergence) >= divergenceThreshold
+
+// Spread alert (market fragmentation)
+bool spreadAlert = spreadRet >= spreadThreshold
+
+// Track which assets are diverging significantly from BTC
+bool[] divergingFromBtc = array.new_bool(32, false)
+if enableAlerts
+    array.set(divergingFromBtc, 0, false)  // BTC (self)
+    array.set(divergingFromBtc, 1, math.abs(ret02 - ret01) >= divergenceThreshold)   // ETH
+    array.set(divergingFromBtc, 2, math.abs(ret03 - ret01) >= divergenceThreshold)   // XRP
+    array.set(divergingFromBtc, 3, math.abs(ret04 - ret01) >= divergenceThreshold)   // BNB
+    array.set(divergingFromBtc, 4, math.abs(ret05 - ret01) >= divergenceThreshold)   // SOL
+    array.set(divergingFromBtc, 5, math.abs(ret06 - ret01) >= divergenceThreshold)   // DOGE
+    array.set(divergingFromBtc, 6, math.abs(ret07 - ret01) >= divergenceThreshold)   // AVAX
+    array.set(divergingFromBtc, 7, math.abs(ret08 - ret01) >= divergenceThreshold)   // LINK
+    array.set(divergingFromBtc, 8, math.abs(ret09 - ret01) >= divergenceThreshold)   // TNSR
+    array.set(divergingFromBtc, 9, math.abs(ret10 - ret01) >= divergenceThreshold)   // ZEC
+    array.set(divergingFromBtc, 10, math.abs(ret11 - ret01) >= divergenceThreshold)  // XMR
+    array.set(divergingFromBtc, 11, math.abs(ret12 - ret01) >= divergenceThreshold)  // ICP
+    array.set(divergingFromBtc, 12, math.abs(ret13 - ret01) >= divergenceThreshold)  // TRX
+    array.set(divergingFromBtc, 13, math.abs(ret14 - ret01) >= divergenceThreshold)  // LTC
+    array.set(divergingFromBtc, 14, math.abs(ret15 - ret01) >= divergenceThreshold)  // KAS
+    array.set(divergingFromBtc, 15, math.abs(ret16 - ret01) >= divergenceThreshold)  // ETC
+    array.set(divergingFromBtc, 16, math.abs(ret17 - ret01) >= divergenceThreshold)  // NEAR
+    array.set(divergingFromBtc, 17, math.abs(ret18 - ret01) >= divergenceThreshold)  // ATOM
+    array.set(divergingFromBtc, 18, math.abs(ret19 - ret01) >= divergenceThreshold)  // GRASS
+    array.set(divergingFromBtc, 19, math.abs(ret20 - ret01) >= divergenceThreshold)  // HYPE
+    array.set(divergingFromBtc, 20, math.abs(ret21 - ret01) >= divergenceThreshold)  // WLD
+    array.set(divergingFromBtc, 21, math.abs(ret22 - ret01) >= divergenceThreshold)  // ONDO
+    array.set(divergingFromBtc, 22, math.abs(ret23 - ret01) >= divergenceThreshold)  // FARTCOIN
+    array.set(divergingFromBtc, 23, math.abs(ret24 - ret01) >= divergenceThreshold)  // PIPPIN
+    array.set(divergingFromBtc, 24, math.abs(ret25 - ret01) >= divergenceThreshold)  // PIEVERSE
+    array.set(divergingFromBtc, 25, math.abs(ret26 - ret01) >= divergenceThreshold)  // JELLY
+    array.set(divergingFromBtc, 26, math.abs(ret27 - ret01) >= divergenceThreshold)  // EDEN
+    array.set(divergingFromBtc, 27, math.abs(ret28 - ret01) >= divergenceThreshold)  // TAKE
+    array.set(divergingFromBtc, 28, math.abs(ret29 - ret01) >= divergenceThreshold)  // MYX
+    array.set(divergingFromBtc, 29, math.abs(ret30 - ret01) >= divergenceThreshold)  // OG
+    array.set(divergingFromBtc, 30, math.abs(ret31 - ret01) >= divergenceThreshold)  // FF
+    array.set(divergingFromBtc, 31, math.abs(ret32 - ret01) >= divergenceThreshold)  // XPIN
+
+// ============================================
+// NEW LEADER / LAGGARD DETECTION
+// ============================================
+// Find current leader and laggard
+int leaderIdx = array.indexof(retArray, maxRet)
+int laggardIdx = array.indexof(retArray, minRet)
+
+// Track previous leader/laggard
+var int prevLeaderIdx = 0
+var int prevLaggardIdx = 0
+
+bool newLeader = leaderIdx != prevLeaderIdx and bar_index > 0
+bool newLaggard = laggardIdx != prevLaggardIdx and bar_index > 0
+
+// Update tracking
+if barstate.isconfirmed
+    prevLeaderIdx := leaderIdx
+    prevLaggardIdx := laggardIdx
+
+// ============================================
+// CLUSTER BREAKOUT (Middle to Extreme)
+// ============================================
+// Detect when asset moves from middle cluster to leader/laggard territory
+isExtreme(float ret) =>
+    ret >= meanRet + (stdRet * 2) or ret <= meanRet - (stdRet * 2)
+
+wasMiddle(float retPrev) =>
+    math.abs(retPrev - nz(meanRet[1])) < (nz(stdRet[1]) * dimThreshold)
+
+// Check for cluster breakouts (all 32 symbols)
+bool clusterBreakout01 = isExtreme(ret01) and wasMiddle(ret01[1])
+bool clusterBreakout02 = isExtreme(ret02) and wasMiddle(ret02[1])
+bool clusterBreakout03 = isExtreme(ret03) and wasMiddle(ret03[1])
+bool clusterBreakout04 = isExtreme(ret04) and wasMiddle(ret04[1])
+bool clusterBreakout05 = isExtreme(ret05) and wasMiddle(ret05[1])
+bool clusterBreakout06 = isExtreme(ret06) and wasMiddle(ret06[1])
+bool clusterBreakout07 = isExtreme(ret07) and wasMiddle(ret07[1])
+bool clusterBreakout08 = isExtreme(ret08) and wasMiddle(ret08[1])
+bool clusterBreakout09 = isExtreme(ret09) and wasMiddle(ret09[1])
+bool clusterBreakout10 = isExtreme(ret10) and wasMiddle(ret10[1])
+bool clusterBreakout11 = isExtreme(ret11) and wasMiddle(ret11[1])
+bool clusterBreakout12 = isExtreme(ret12) and wasMiddle(ret12[1])
+bool clusterBreakout13 = isExtreme(ret13) and wasMiddle(ret13[1])
+bool clusterBreakout14 = isExtreme(ret14) and wasMiddle(ret14[1])
+bool clusterBreakout15 = isExtreme(ret15) and wasMiddle(ret15[1])
+bool clusterBreakout16 = isExtreme(ret16) and wasMiddle(ret16[1])
+bool clusterBreakout17 = isExtreme(ret17) and wasMiddle(ret17[1])
+bool clusterBreakout18 = isExtreme(ret18) and wasMiddle(ret18[1])
+bool clusterBreakout19 = isExtreme(ret19) and wasMiddle(ret19[1])
+bool clusterBreakout20 = isExtreme(ret20) and wasMiddle(ret20[1])
+bool clusterBreakout21 = isExtreme(ret21) and wasMiddle(ret21[1])
+bool clusterBreakout22 = isExtreme(ret22) and wasMiddle(ret22[1])
+bool clusterBreakout23 = isExtreme(ret23) and wasMiddle(ret23[1])
+bool clusterBreakout24 = isExtreme(ret24) and wasMiddle(ret24[1])
+bool clusterBreakout25 = isExtreme(ret25) and wasMiddle(ret25[1])
+bool clusterBreakout26 = isExtreme(ret26) and wasMiddle(ret26[1])
+bool clusterBreakout27 = isExtreme(ret27) and wasMiddle(ret27[1])
+bool clusterBreakout28 = isExtreme(ret28) and wasMiddle(ret28[1])
+bool clusterBreakout29 = isExtreme(ret29) and wasMiddle(ret29[1])
+bool clusterBreakout30 = isExtreme(ret30) and wasMiddle(ret30[1])
+bool clusterBreakout31 = isExtreme(ret31) and wasMiddle(ret31[1])
+bool clusterBreakout32 = isExtreme(ret32) and wasMiddle(ret32[1])
+
+bool anyClusterBreakout = clusterBreakout01 or clusterBreakout02 or clusterBreakout03 or clusterBreakout04 or
+                          clusterBreakout05 or clusterBreakout06 or clusterBreakout07 or clusterBreakout08 or
+                          clusterBreakout09 or clusterBreakout10 or clusterBreakout11 or clusterBreakout12 or
+                          clusterBreakout13 or clusterBreakout14 or clusterBreakout15 or clusterBreakout16 or
+                          clusterBreakout17 or clusterBreakout18 or clusterBreakout19 or clusterBreakout20 or
+                          clusterBreakout21 or clusterBreakout22 or clusterBreakout23 or clusterBreakout24 or
+                          clusterBreakout25 or clusterBreakout26 or clusterBreakout27 or clusterBreakout28 or
+                          clusterBreakout29 or clusterBreakout30 or clusterBreakout31 or clusterBreakout32
+
+// ============================================
+// ALERT CONDITIONS & MESSAGES
+// ============================================
+// Build breakout message (all 32 symbols)
+var string breakoutMsg = ""
+if anyBreakout and canAlertBreakout and barstate.isconfirmed
+    breakoutMsg := "BREAKOUT: "
+    if breakout01
+        breakoutMsg := breakoutMsg + "BTC(" + str.tostring(change01, "#.#") + "%) "
+    if breakout02
+        breakoutMsg := breakoutMsg + "ETH(" + str.tostring(change02, "#.#") + "%) "
+    if breakout03
+        breakoutMsg := breakoutMsg + "XRP(" + str.tostring(change03, "#.#") + "%) "
+    if breakout04
+        breakoutMsg := breakoutMsg + "BNB(" + str.tostring(change04, "#.#") + "%) "
+    if breakout05
+        breakoutMsg := breakoutMsg + "SOL(" + str.tostring(change05, "#.#") + "%) "
+    if breakout06
+        breakoutMsg := breakoutMsg + "DOGE(" + str.tostring(change06, "#.#") + "%) "
+    if breakout07
+        breakoutMsg := breakoutMsg + "AVAX(" + str.tostring(change07, "#.#") + "%) "
+    if breakout08
+        breakoutMsg := breakoutMsg + "LINK(" + str.tostring(change08, "#.#") + "%) "
+    if breakout09
+        breakoutMsg := breakoutMsg + "TNSR(" + str.tostring(change09, "#.#") + "%) "
+    if breakout10
+        breakoutMsg := breakoutMsg + "ZEC(" + str.tostring(change10, "#.#") + "%) "
+    if breakout11
+        breakoutMsg := breakoutMsg + "XMR(" + str.tostring(change11, "#.#") + "%) "
+    if breakout12
+        breakoutMsg := breakoutMsg + "ICP(" + str.tostring(change12, "#.#") + "%) "
+    if breakout13
+        breakoutMsg := breakoutMsg + "TRX(" + str.tostring(change13, "#.#") + "%) "
+    if breakout14
+        breakoutMsg := breakoutMsg + "LTC(" + str.tostring(change14, "#.#") + "%) "
+    if breakout15
+        breakoutMsg := breakoutMsg + "KAS(" + str.tostring(change15, "#.#") + "%) "
+    if breakout16
+        breakoutMsg := breakoutMsg + "ETC(" + str.tostring(change16, "#.#") + "%) "
+    if breakout17
+        breakoutMsg := breakoutMsg + "NEAR(" + str.tostring(change17, "#.#") + "%) "
+    if breakout18
+        breakoutMsg := breakoutMsg + "ATOM(" + str.tostring(change18, "#.#") + "%) "
+    if breakout19
+        breakoutMsg := breakoutMsg + "GRASS(" + str.tostring(change19, "#.#") + "%) "
+    if breakout20
+        breakoutMsg := breakoutMsg + "HYPE(" + str.tostring(change20, "#.#") + "%) "
+    if breakout21
+        breakoutMsg := breakoutMsg + "WLD(" + str.tostring(change21, "#.#") + "%) "
+    if breakout22
+        breakoutMsg := breakoutMsg + "ONDO(" + str.tostring(change22, "#.#") + "%) "
+    if breakout23
+        breakoutMsg := breakoutMsg + "FARTCOIN(" + str.tostring(change23, "#.#") + "%) "
+    if breakout24
+        breakoutMsg := breakoutMsg + "PIPPIN(" + str.tostring(change24, "#.#") + "%) "
+    if breakout25
+        breakoutMsg := breakoutMsg + "PIEVERSE(" + str.tostring(change25, "#.#") + "%) "
+    if breakout26
+        breakoutMsg := breakoutMsg + "JELLY(" + str.tostring(change26, "#.#") + "%) "
+    if breakout27
+        breakoutMsg := breakoutMsg + "EDEN(" + str.tostring(change27, "#.#") + "%) "
+    if breakout28
+        breakoutMsg := breakoutMsg + "TAKE(" + str.tostring(change28, "#.#") + "%) "
+    if breakout29
+        breakoutMsg := breakoutMsg + "MYX(" + str.tostring(change29, "#.#") + "%) "
+    if breakout30
+        breakoutMsg := breakoutMsg + "OG(" + str.tostring(change30, "#.#") + "%) "
+    if breakout31
+        breakoutMsg := breakoutMsg + "FF(" + str.tostring(change31, "#.#") + "%) "
+    if breakout32
+        breakoutMsg := breakoutMsg + "XPIN(" + str.tostring(change32, "#.#") + "%) "
+    lastBreakoutBar := bar_index
+
+// Divergence message
+var string divergenceMsg = ""
+if (btcAltDivergenceAlert or ethBtcDivergenceAlert or capDivergenceAlert) and canAlertDivergence and barstate.isconfirmed
+    divergenceMsg := "DIVERGENCE: "
+    if btcAltDivergenceAlert
+        divergenceMsg := divergenceMsg + "BTC vs Alts(" + str.tostring(btcAltDivergence, "#.#") + "%) "
+    if ethBtcDivergenceAlert
+        divergenceMsg := divergenceMsg + "ETH vs BTC(" + str.tostring(ethBtcDivergence, "#.#") + "%) "
+    if capDivergenceAlert
+        divergenceMsg := divergenceMsg + "Large vs Small Cap(" + str.tostring(capDivergence, "#.#") + "%) "
+    lastDivergenceBar := bar_index
+
+// Spread message
+var string spreadMsg = ""
+if spreadAlert and canAlertSpread and barstate.isconfirmed
+    spreadMsg := "SPREAD ALERT: Top-Bottom spread is " + str.tostring(spreadRet, "#.#") + "% (>" + str.tostring(spreadThreshold) + "%)"
+    lastSpreadBar := bar_index
+
+// New leader message
+string leaderMsg = newLeader ? "NEW LEADER: " + array.get(symNames, leaderIdx) + " (" + str.tostring(maxRet, "#.##") + "%)" : ""
+string laggardMsg = newLaggard ? "NEW LAGGARD: " + array.get(symNames, laggardIdx) + " (" + str.tostring(minRet, "#.##") + "%)" : ""
+
+// ============================================
+// TRIGGER ALERTS (with barstate.isconfirmed to prevent firing on incomplete bars)
+// ============================================
+alertcondition(anyBreakout and canAlertBreakout and enableAlerts and barstate.isconfirmed, title="Breakout Alert", message="Asset breakout detected!")
+alertcondition(btcAltDivergenceAlert and canAlertDivergence and enableAlerts and barstate.isconfirmed, title="BTC vs Altcoin Divergence", message="BTC diverging from altcoins!")
+alertcondition(ethBtcDivergenceAlert and canAlertDivergence and enableAlerts and barstate.isconfirmed, title="ETH vs BTC Divergence", message="ETH diverging from BTC!")
+alertcondition(capDivergenceAlert and canAlertDivergence and enableAlerts and barstate.isconfirmed, title="Large vs Small Cap Divergence", message="Large caps diverging from small caps!")
+alertcondition(spreadAlert and canAlertSpread and enableAlerts and barstate.isconfirmed, title="Spread Alert", message="Market spread exceeds threshold!")
+alertcondition(newLeader and enableAlerts and barstate.isconfirmed, title="New Leader", message="New market leader detected!")
+alertcondition(newLaggard and enableAlerts and barstate.isconfirmed, title="New Laggard", message="New market laggard detected!")
+alertcondition(anyClusterBreakout and enableAlerts and barstate.isconfirmed, title="Cluster Breakout", message="Asset broke out of middle cluster!")
+
+// Combined alert
+bool combinedAlertCondition = ((anyBreakout and canAlertBreakout) or (btcAltDivergenceAlert and canAlertDivergence) or (spreadAlert and canAlertSpread) or newLeader or newLaggard) and barstate.isconfirmed
+alertcondition(combinedAlertCondition, title="Any Spaghetti Alert", message="Spaghetti indicator alert triggered!")
+
+// ============================================
+// PLOT LINES (Dynamic: Top 10 + Bottom 10 performers)
+// Only 20 plot() calls but displays ANY of the 32 symbols dynamically
+// Whichever symbols are currently in top/bottom 10 get displayed
+// ============================================
+
+// Top 10 performers (dynamic - any symbol can appear here)
+// display=display.pane removes the automatic price scale labels that cause duplicates
+plot(topVal01, "Top 1", color=topCol01, linewidth=lineWidth, display=display.pane)
+plot(topVal02, "Top 2", color=topCol02, linewidth=lineWidth, display=display.pane)
+plot(topVal03, "Top 3", color=topCol03, linewidth=lineWidth, display=display.pane)
+plot(topVal04, "Top 4", color=topCol04, linewidth=lineWidth, display=display.pane)
+plot(topVal05, "Top 5", color=topCol05, linewidth=lineWidth, display=display.pane)
+plot(topVal06, "Top 6", color=topCol06, linewidth=lineWidth, display=display.pane)
+plot(topVal07, "Top 7", color=topCol07, linewidth=lineWidth, display=display.pane)
+plot(topVal08, "Top 8", color=topCol08, linewidth=lineWidth, display=display.pane)
+plot(topVal09, "Top 9", color=topCol09, linewidth=lineWidth, display=display.pane)
+plot(topVal10, "Top 10", color=topCol10, linewidth=lineWidth, display=display.pane)
+
+// Bottom 10 performers (dynamic - any symbol can appear here)
+plot(botVal01, "Bottom 1", color=botCol01, linewidth=lineWidth, display=display.pane)
+plot(botVal02, "Bottom 2", color=botCol02, linewidth=lineWidth, display=display.pane)
+plot(botVal03, "Bottom 3", color=botCol03, linewidth=lineWidth, display=display.pane)
+plot(botVal04, "Bottom 4", color=botCol04, linewidth=lineWidth, display=display.pane)
+plot(botVal05, "Bottom 5", color=botCol05, linewidth=lineWidth, display=display.pane)
+plot(botVal06, "Bottom 6", color=botCol06, linewidth=lineWidth, display=display.pane)
+plot(botVal07, "Bottom 7", color=botCol07, linewidth=lineWidth, display=display.pane)
+plot(botVal08, "Bottom 8", color=botCol08, linewidth=lineWidth, display=display.pane)
+plot(botVal09, "Bottom 9", color=botCol09, linewidth=lineWidth, display=display.pane)
+plot(botVal10, "Bottom 10", color=botCol10, linewidth=lineWidth, display=display.pane)
+
+// Zero line (toggleable)
+hline(showZeroLine ? 0 : na, "Zero", color=color.gray, linestyle=hline.style_dashed)
+
+// Plot divergence bands (toggleable)
+plot(showBands ? meanRet + stdRet * 2 : na, "Upper Band", color=color.new(color.green, 80), style=plot.style_stepline)
+plot(showBands ? meanRet - stdRet * 2 : na, "Lower Band", color=color.new(color.red, 80), style=plot.style_stepline)
+plot(showMeanLine ? meanRet : na, "Mean", color=color.new(color.white, 70), style=plot.style_stepline)
+
+// ============================================
+// BREAKOUT LABELS
+// ============================================
+if showBreakoutLabels and anyBreakout and canAlertBreakout
+    if breakout01
+        label.new(bar_index, ret01, "BTC\n" + str.tostring(change01, "#.#") + "%",
+                  color=change01 > 0 ? color.green : color.red, textcolor=color.white, size=size.tiny, style=label.style_label_down)
+    if breakout02
+        label.new(bar_index, ret02, "ETH\n" + str.tostring(change02, "#.#") + "%",
+                  color=change02 > 0 ? color.green : color.red, textcolor=color.white, size=size.tiny, style=label.style_label_down)
+    if breakout05
+        label.new(bar_index, ret05, "SOL\n" + str.tostring(change05, "#.#") + "%",
+                  color=change05 > 0 ? color.green : color.red, textcolor=color.white, size=size.tiny, style=label.style_label_down)
+    if breakout09
+        label.new(bar_index, ret09, "TNSR\n" + str.tostring(change09, "#.#") + "%",
+                  color=change09 > 0 ? color.green : color.red, textcolor=color.white, size=size.tiny, style=label.style_label_down)
+    if breakout10
+        label.new(bar_index, ret10, "ZEC\n" + str.tostring(change10, "#.#") + "%",
+                  color=change10 > 0 ? color.green : color.red, textcolor=color.white, size=size.tiny, style=label.style_label_down)
+
+// ============================================
+// DIVERGENCE LABELS
+// ============================================
+if showDivergenceLabels and btcAltDivergenceAlert and canAlertDivergence
+    string divDir = btcAltDivergence > 0 ? "BTC > Alts" : "Alts > BTC"
+    label.new(bar_index, meanRet, "DIV\n" + divDir,
+              color=color.purple, textcolor=color.white, size=size.tiny, style=label.style_diamond)
+
+// ============================================
+// SORTED PERFORMANCE TABLE
+// ============================================
+// Determine table position
+string tablePos = tablePosition == "Top Right" ? position.top_right :
+                  tablePosition == "Top Left" ? position.top_left :
+                  tablePosition == "Bottom Right" ? position.bottom_right :
+                  position.bottom_left
+
+if showTable and barstate.islast
+    var color[] colors = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32)
+
+    float[] returns = array.from(ret01, ret02, ret03, ret04, ret05, ret06, ret07, ret08, ret09, ret10, ret11, ret12, ret13, ret14, ret15, ret16, ret17, ret18, ret19, ret20, ret21, ret22, ret23, ret24, ret25, ret26, ret27, ret28, ret29, ret30, ret31, ret32)
+
+    // Create index array for sorting
+    int[] indices = array.new_int(32)
+    for i = 0 to 31
+        array.set(indices, i, i)
+
+    // Bubble sort by returns (descending)
+    for i = 0 to 30
+        for j = 0 to 30 - i
+            if array.get(returns, array.get(indices, j)) < array.get(returns, array.get(indices, j + 1))
+                int temp = array.get(indices, j)
+                array.set(indices, j, array.get(indices, j + 1))
+                array.set(indices, j + 1, temp)
+
+    // Create compact table with clean styling
+    var table perfTable = table.new(tablePos, 3, 22, bgcolor=color.new(#1a1a2e, 10), border_width=0)
+
+    // Header row
+    table.cell(perfTable, 0, 0, "#", bgcolor=color.new(#16213e, 0), text_color=color.gray, text_size=size.normal)
+    table.cell(perfTable, 1, 0, "Coin", bgcolor=color.new(#16213e, 0), text_color=color.gray, text_size=size.normal)
+    table.cell(perfTable, 2, 0, "%", bgcolor=color.new(#16213e, 0), text_color=color.gray, text_size=size.normal)
+
+    // Get changes array
+    float[] changes = array.from(change01, change02, change03, change04, change05, change06, change07, change08, change09, change10, change11, change12, change13, change14, change15, change16, change17, change18, change19, change20, change21, change22, change23, change24, change25, change26, change27, change28, change29, change30, change31, change32)
+
+    // Show top 10 and bottom 10 (matching plotted lines)
+    for i = 0 to 19
+        int tableRow = i + 1
+        int sortIdx = i < 10 ? i : 12 + i  // Top 10 (0-9) then Bottom 10 (22-31)
+        int idx = array.get(indices, sortIdx)
+        string ticker = array.get(tickerNames, idx)
+        float ret = array.get(returns, idx)
+        color col = array.get(colors, idx)
+        color retCol = ret > 0 ? color.new(#00ff88, 0) : color.new(#ff4757, 0)
+        string rankStr = i < 10 ? str.tostring(sortIdx + 1) : str.tostring(sortIdx + 1)
+        color rowBg = i < 10 ? color.new(#0f3460, 80) : color.new(#3d0f0f, 80)
+
+        table.cell(perfTable, 0, tableRow, rankStr, bgcolor=rowBg, text_color=color.gray, text_size=size.normal)
+        table.cell(perfTable, 1, tableRow, ticker, bgcolor=rowBg, text_color=col, text_size=size.normal)
+        table.cell(perfTable, 2, tableRow, str.tostring(ret, "#.##") + "%", bgcolor=rowBg, text_color=retCol, text_size=size.normal)
+
+    // Spread footer
+    table.cell(perfTable, 0, 21, "", bgcolor=color.new(#16213e, 0))
+    table.cell(perfTable, 1, 21, "Spread", bgcolor=color.new(#16213e, 0), text_color=color.gray, text_size=size.normal)
+    table.cell(perfTable, 2, 21, str.tostring(spreadRet, "#.#") + "%", bgcolor=color.new(#16213e, 0), text_color=spreadAlert ? color.yellow : color.white, text_size=size.normal)
+
+// ============================================
+// DYNAMIC END LABELS (Simple ticker names only)
+// ============================================
+// Persistent label array to track and delete old labels (prevents duplicates)
+var label[] endLabels = array.new_label(20, na)
+
+if showEndLabels and barstate.islast
+    // Delete all existing end labels first to prevent duplicates
+    for i = 0 to array.size(endLabels) - 1
+        label oldLabel = array.get(endLabels, i)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+
+    // Create arrays for dynamic label positioning
+    float[] endReturns = array.from(ret01, ret02, ret03, ret04, ret05, ret06, ret07, ret08, ret09, ret10, ret11, ret12, ret13, ret14, ret15, ret16, ret17, ret18, ret19, ret20, ret21, ret22, ret23, ret24, ret25, ret26, ret27, ret28, ret29, ret30, ret31, ret32)
+
+    color[] endColors = array.from(c01, c02, c03, c04, c05, c06, c07, c08, c09, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32)
+
+    // Sort indices by return value for label stacking
+    int[] labelIndices = array.new_int(32)
+    for i = 0 to 31
+        array.set(labelIndices, i, i)
+
+    // Sort by return (descending) to stack labels properly
+    for i = 0 to 30
+        for j = 0 to 30 - i
+            int idxJ = array.get(labelIndices, j)
+            int idxJ1 = array.get(labelIndices, j + 1)
+            if array.get(endReturns, idxJ) < array.get(endReturns, idxJ1)
+                array.set(labelIndices, j, idxJ1)
+                array.set(labelIndices, j + 1, idxJ)
+
+    // Simple labels - just ticker name, no box
+    int labelCount = 0
+    for i = 0 to 31
+        int idx = array.get(labelIndices, i)
+        float retVal = array.get(endReturns, idx)
+        string ticker = array.get(tickerNames, idx)
+        color symColor = array.get(endColors, idx)
+
+        // Only show labels for top 10 and bottom 10 (matching plotted lines)
+        if i < 10 or i > 21
+            label newLabel = label.new(bar_index + 3, retVal, ticker,
+                      style=label.style_none, textcolor=symColor, size=size.small)
+            array.set(endLabels, labelCount, newLabel)
+            labelCount += 1
+
+// Info label removed for cleaner chart - stats available in table

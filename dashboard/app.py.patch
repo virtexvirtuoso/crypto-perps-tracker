@@ -1,0 +1,18 @@
+--- a/dashboard/app.py
++++ b/dashboard/app.py
+@@ -127,8 +127,13 @@
+ 
+         # CEX vs DEX split
+         dex_exchanges = {'hyperliquid', 'asterdex', 'dydx'}
+-        cex_volume = sum(m.volume_24h for m in markets if m.exchange.lower() not in dex_exchanges)
+-        dex_volume = sum(m.volume_24h for m in markets if m.exchange.lower() in dex_exchanges)
++        # Helper function to check if exchange is DEX (handles variations like "dYdX v4")
++        def is_dex(exchange_name: str) -> bool:
++            name_lower = exchange_name.lower()
++            return any(dex in name_lower for dex in dex_exchanges)
++
++        cex_volume = sum(m.volume_24h for m in markets if not is_dex(m.exchange))
++        dex_volume = sum(m.volume_24h for m in markets if is_dex(m.exchange))
+         cex_pct = (cex_volume / total_volume * 100) if total_volume > 0 else 0
+         dex_pct = (dex_volume / total_volume * 100) if total_volume > 0 else 0
+ 

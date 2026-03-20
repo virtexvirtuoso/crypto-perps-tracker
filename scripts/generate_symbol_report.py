@@ -51,11 +51,48 @@ def normalize_symbol(symbol: str) -> str:
         BTC-USDT-SWAP -> BTC
         BTC-PERP -> BTC
         BTC_USDT -> BTC
+        XBTUSDTM -> BTC (KuCoin format)
+        PI_XBTUSD -> BTC (Kraken format)
+        USDCUSDT -> USDC (stablecoin preserved)
     """
     symbol = symbol.upper()
-    symbol = symbol.replace('USDT', '').replace('USDC', '').replace('USD', '')
+
+    # Remove exchange-specific prefixes (Kraken)
+    if symbol.startswith('PI_') or symbol.startswith('PF_'):
+        symbol = symbol[3:]  # Remove PI_ or PF_ prefix
+    elif (symbol.startswith('PI') or symbol.startswith('PF')) and len(symbol) > 2:
+        # Handle PI/PF without underscore (e.g., PFSOL, PFXRP, PIBTC)
+        symbol = symbol[2:]  # Remove PI or PF prefix
+
+    # Remove contract type suffixes first (before removing quote currencies)
     symbol = symbol.replace('-PERP', '').replace('-SWAP', '').replace('_UMCBL', '')
-    symbol = symbol.replace('-', '').replace('_', '').replace('PERPETUAL', '')
+    symbol = symbol.replace('PERPETUAL', '')
+
+    # Remove separators
+    symbol = symbol.replace('-', '').replace('_', '')
+
+    # Handle KuCoin format with M suffix (e.g., XBTUSDTM, ETHUSDTM)
+    # Check for quote+M patterns before removing quote currencies
+    kucoin_patterns = ['USDTM', 'USDCM', 'USDM']
+    for pattern in kucoin_patterns:
+        if symbol.endswith(pattern):
+            # Remove the entire pattern (quote + M)
+            symbol = symbol[:-len(pattern)]
+            break
+    else:
+        # Not KuCoin format, remove quote currencies normally
+        # Order matters: check longer patterns first to avoid partial matches
+        if symbol.endswith('USDT'):
+            symbol = symbol[:-4]
+        elif symbol.endswith('USDC'):
+            symbol = symbol[:-4]
+        elif symbol.endswith('USD'):
+            symbol = symbol[:-3]
+
+    # Standardize XBT -> BTC (KuCoin and Kraken use XBT for Bitcoin)
+    if symbol == 'XBT':
+        symbol = 'BTC'
+
     return symbol.strip()
 
 
@@ -148,8 +185,18 @@ def analyze_symbol(symbol: str, exchange_data: List[SymbolData], btc_price_chang
         avg_funding = sum(fr[1] for fr in funding_rates) / len(funding_rates)
 
     # Price change momentum
+    # Calculate average from exchanges that have price change data
     price_changes = [d.price_change_24h_pct for d in valid_data if d.price_change_24h_pct is not None]
     avg_price_change = sum(price_changes) / len(price_changes) if price_changes else None
+
+    # Fill in missing price changes with the average (for exchanges like Coinbase INTX)
+    # This allows all exchanges to contribute to the aggregated data
+    if avg_price_change is not None:
+        valid_data = [
+            d if d.price_change_24h_pct is not None
+            else d.copy(update={'price_change_24h_pct': avg_price_change})
+            for d in valid_data
+        ]
 
     # Bitcoin Beta calculation
     btc_beta = None

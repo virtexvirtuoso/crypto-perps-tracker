@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Virtuoso - Crypto Perps Tracker</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* Brand Colors */
+            --neon-amber: #fbbf24;
+            --neon-cyan: #06B6D4;
+            --neon-red: #ff0066;
+
+            /* Dark Mode Colors */
+            --dark-bg-primary: #0a0a0a;
+            --dark-bg-secondary: #111111;
+            --dark-bg-tertiary: #1a1a1a;
+            --dark-border: #222222;
+            --dark-border-hover: #333333;
+
+            --dark-text-primary: #e0e0e0;
+            --dark-text-secondary: #9ca3af;
+            --dark-text-tertiary: #6b7280;
+
+            /* Semantic Colors */
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+
+            /* Trading-specific colors */
+            --long-color: #10b981;
+            --short-color: #ef4444;
+            --volume-gradient-start: rgba(251, 191, 36, 0.15);
+            --volume-gradient-end: rgba(251, 191, 36, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark-bg-primary);
+            color: var(--dark-text-primary);
+            line-height: 1.5;
+            position: relative;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Grid Overlay Pattern - Subtler */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+            background-size: 32px 32px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--neon-amber) 0%, var(--neon-cyan) 100%);
+            z-index: 9999;
+            box-shadow: 0 0 8px var(--neon-amber);
+        }
+
+        /* Header - More compact for terminal feel */
+        .header {
+            position: sticky;
+            top: 0;
+            background: rgba(17, 17, 17, 0.98);
+            border-bottom: 1px solid var(--dark-border);
+            padding: 1rem 0;
+            z-index: 1000;
+            backdrop-filter: blur(12px);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .logo {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--neon-amber);
+            text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.625rem;
+            color: var(--dark-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 2px;
+        }
+
+        .pulse-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--dark-text-secondary);
+            padding: 0.375rem 0.75rem;
+            background: var(--dark-bg-tertiary);
+            border-radius: 0.25rem;
+            border: 1px solid var(--dark-border);
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 6px var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.3); }
+        }
+
+        /* Header Stats - Improved hierarchy */
+        .header-stats {
+            display: flex;
+            gap: 2.5rem;
+            align-items: center;
+        }
+
+        .header-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        .header-stat-label {
+            font-size: 0.625rem;
+            color: var(--dark-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .header-stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--neon-amber);
+            letter-spacing: -0.5px;
+        }
+
+        /* Stats Overview - Enhanced cards */
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--dark-bg-secondary) 0%, rgba(26, 26, 26, 0.6) 100%);
+            border: 1px solid var(--dark-border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-amber), transparent);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(251, 191, 36, 0.3);
+            box-shadow: 0 4px 16px rgba(251, 191, 36, 0.1);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.875rem;
+        }
+
+        .stat-card-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(251, 191, 36, 0.08);
+            border-radius: 0.375rem;
+            color: var(--neon-amber);
+            font-size: 0.875rem;
+        }
+
+        .stat-card-title {
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dark-text-secondary);
+            flex: 1;
+            margin-left: 0.75rem;
+        }
+
+        .stat-card-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--neon-amber);
+            letter-spacing: -1px;
+            margin-bottom: 0.375rem;
+        }
+
+        .stat-card-change {
+            font-size: 0.75rem;
+            color: var(--dark-text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .stat-card-change.positive {
+            color: var(--success);
+        }
+
+        .stat-card-change.negative {
+            color: var(--error);
+        }
+
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 1rem;
+            margin: 1.5rem 0 3rem;
+        }
+
+        /* Section Card */
+        .section-card {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.875rem;
+            border-bottom: 1px solid var(--dark-border);
+        }
+
+        .section-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dark-text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .section-title i {
+            color: var(--neon-amber);
+            font-size: 0.875rem;
+        }
+
+        /* Table - Trading terminal style */
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.375rem;
+            border: 1px solid var(--dark-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8125rem;
+        }
+
+        thead th {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--dark-text-tertiary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--dark-border);
+            background: var(--dark-bg-tertiary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        thead th:hover {
+            color: var(--neon-amber);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid rgba(34, 34, 34, 0.5);
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        tbody tr::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--neon-amber);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(26, 26, 26, 0.8);
+        }
+
+        tbody tr:hover::before {
+            opacity: 1;
+        }
+
+        tbody td {
+            padding: 0.875rem 1rem;
+            color: var(--dark-text-primary);
+            white-space: nowrap;
+        }
+
+        tbody td:first-child {
+            font-weight: 600;
+            color: var(--dark-text-primary);
+        }
+
+        /* Volume and OI bars - Visual encoding */
+        .value-with-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mini-bar {
+            height: 3px;
+            background: linear-gradient(90deg, var(--volume-gradient-start), var(--volume-gradient-end));
+            border-radius: 2px;
+            min-width: 2px;
+            transition: all 0.2s ease;
+        }
+
+        tr:hover .mini-bar {
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.1));
+        }
+
+        /* Tags/Badges - More refined */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.25rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-cex {
+            background: rgba(251, 191, 36, 0.1);
+            color: var(--neon-amber);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+
+        .tag-dex {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--neon-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+        }
+
+        /* Funding Rate Display */
+        .funding-rate {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .funding-rate::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .funding-rate.positive::before {
+            background: var(--error);
+            box-shadow: 0 0 4px var(--error);
+        }
+
+        .funding-rate.negative::before {
+            background: var(--success);
+            box-shadow: 0 0 4px var(--success);
+        }
+
+        .funding-rate.neutral::before {
+            background: var(--dark-text-tertiary);
+        }
+
+        /* Charts */
+        .chart-container {
+            background: var(--dark-bg-primary);
+            border-radius: 0.375rem;
+            padding: 1rem;
+            min-height: 280px;
+            border: 1px solid rgba(34, 34, 34, 0.5);
+        }
+
+        /* Sidebar Widgets */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .funding-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--dark-bg-tertiary);
+            border-radius: 0.375rem;
+            border-left: 2px solid transparent;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .funding-item::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.05));
+            transition: width 0.15s ease;
+        }
+
+        .funding-item:hover {
+            background: rgba(26, 26, 26, 0.8);
+            border-left-color: var(--neon-amber);
+        }
+
+        .funding-item:hover::after {
+            width: 100%;
+        }
+
+        .funding-item-info {
+            z-index: 1;
+        }
+
+        .funding-item-symbol {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            color: var(--dark-text-primary);
+            font-size: 0.8125rem;
+            margin-bottom: 2px;
+        }
+
+        .funding-item-exchange {
+            font-size: 0.6875rem;
+            color: var(--dark-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .funding-item-rate {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            font-size: 0.9375rem;
+            z-index: 1;
+        }
+
+        .funding-item-rate.positive {
+            color: var(--error);
+        }
+
+        .funding-item-rate.negative {
+            color: var(--success);
+        }
+
+        /* Quick Stats Panel */
+        .quick-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.875rem;
+            background: var(--dark-bg-tertiary);
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .quick-stat:hover {
+            border-color: rgba(251, 191, 36, 0.2);
+            background: rgba(26, 26, 26, 0.8);
+        }
+
+        .quick-stat-label {
+            font-size: 0.75rem;
+            color: var(--dark-text-secondary);
+            font-weight: 500;
+        }
+
+        .quick-stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            color: var(--neon-amber);
+            font-size: 0.875rem;
+        }
+
+        /* Sortable Column Header */
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: color 0.15s ease;
+        }
+
+        .sortable::after {
+            content: '⇅';
+            opacity: 0.3;
+            margin-left: 0.375rem;
+            font-size: 0.75rem;
+        }
+
+        .sortable:hover::after {
+            opacity: 1;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 1.5rem 0;
+            margin-top: 2rem;
+            border-top: 1px solid var(--dark-border);
+            color: var(--dark-text-tertiary);
+            font-size: 0.75rem;
+        }
+
+        .update-time {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--dark-text-secondary);
+            margin-top: 0.375rem;
+            font-size: 0.6875rem;
+        }
+
+        .update-time span {
+            color: var(--neon-amber);
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            color: var(--neon-amber);
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--dark-border);
+            border-top-color: var(--neon-amber);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Number formatting */
+        .number-large {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--error);
+        }
+
+        .neutral {
+            color: var(--dark-text-secondary);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1400px) {
+            .content-grid {
+                grid-template-columns: 1fr 380px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .header-stats {
+                width: 100%;
+                justify-content: space-between;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-overview {
+                grid-template-columns: 1fr;
+            }
+
+            .header-stats {
+                grid-template-columns: repeat(2, 1fr);
+                display: grid;
+                gap: 0.75rem;
+            }
+
+            .header-stat {
+                align-items: flex-start;
+            }
+
+            .stat-card-value {
+                font-size: 1.5rem;
+            }
+
+            table {
+                font-size: 0.75rem;
+            }
+
+            tbody td, thead th {
+                padding: 0.625rem;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Accessibility improvements */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* High contrast for numbers */
+        .number-highlight {
+            color: #ffffff;
+        }
+
+        /* Tooltip for additional context */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.375rem 0.625rem;
+            background: rgba(0, 0, 0, 0.95);
+            color: var(--dark-text-primary);
+            font-size: 0.6875rem;
+            white-space: nowrap;
+            border-radius: 0.25rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            border: 1px solid var(--dark-border);
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Progress Bar -->
+    <div class="progress-bar"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="header-left">
+                    <div>
+                        <div class="logo">PERPS TRACKER</div>
+                        <div class="subtitle">Virtuoso Crypto</div>
+                    </div>
+                    <div class="pulse-indicator">
+                        <div class="pulse-dot"></div>
+                        <span>Live Data</span>
+                    </div>
+                </div>
+                <div class="header-stats" id="header-stats">
+                    <div class="header-stat">
+                        <div class="header-stat-label">Total Volume</div>
+                        <div class="header-stat-value" id="header-volume">--</div>
+                    </div>
+                    <div class="header-stat">
+                        <div class="header-stat-label">Total OI</div>
+                        <div class="header-stat-value" id="header-oi">--</div>
+                    </div>
+                    <div class="header-stat">
+                        <div class="header-stat-label">Exchanges</div>
+                        <div class="header-stat-value" id="header-exchanges">--</div>
+                    </div>
+                    <div class="header-stat">
+                        <div class="header-stat-label">Avg Funding</div>
+                        <div class="header-stat-value" id="header-funding">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Stats Overview -->
+        <section class="stats-overview" id="stats-overview">
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <div class="stat-card-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-card-title">Total Volume 24h</div>
+                </div>
+                <div class="stat-card-value" id="stat-volume">$0.0B</div>
+                <div class="stat-card-change neutral" id="stat-volume-change">--</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <div class="stat-card-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="stat-card-title">Open Interest</div>
+                </div>
+                <div class="stat-card-value" id="stat-oi">$0.0B</div>
+                <div class="stat-card-change neutral" id="stat-oi-change">--</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <div class="stat-card-icon">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <div class="stat-card-title">Exchange Count</div>
+                </div>
+                <div class="stat-card-value" id="stat-exchanges">0</div>
+                <div class="stat-card-change neutral" id="stat-exchanges-change">--</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <div class="stat-card-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-card-title">Average Funding</div>
+                </div>
+                <div class="stat-card-value" id="stat-funding">0.00%</div>
+                <div class="stat-card-change neutral" id="stat-funding-change">--</div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+            <!-- Left Column: Market Data Table -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i class="fas fa-table"></i>
+                        Market Data
+                    </h2>
+                    <div class="pulse-indicator">
+                        <div class="pulse-dot"></div>
+                        <span>Auto-refresh: 2min</span>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="market-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="exchange">Exchange</th>
+                                <th class="sortable" data-sort="type">Type</th>
+                                <th class="sortable" data-sort="volume">Volume 24h</th>
+                                <th class="sortable" data-sort="oi">Open Interest</th>
+                                <th class="sortable" data-sort="funding">Funding Rate</th>
+                                <th class="sortable" data-sort="markets">Markets</th>
+                            </tr>
+                        </thead>
+                        <tbody id="market-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Column: Charts & Quick Stats -->
+            <div class="sidebar">
+                <!-- DEX vs CEX Chart -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="fas fa-chart-pie"></i>
+                            DEX vs CEX
+                        </h2>
+                    </div>
+                    <div class="chart-container" id="dex-cex-chart">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Funding Rates -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="fas fa-bolt"></i>
+                            Top Funding Rates
+                        </h2>
+                    </div>
+                    <div id="funding-list">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="section-card">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Quick Stats
+                        </h2>
+                    </div>
+                    <div id="quick-stats">
+                        <div class="quick-stat">
+                            <div class="quick-stat-label">CEX Dominance</div>
+                            <div class="quick-stat-value" id="cex-dominance">--</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-label">DEX Dominance</div>
+                            <div class="quick-stat-value" id="dex-dominance">--</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-label">Highest Volume</div>
+                            <div class="quick-stat-value" id="highest-volume">--</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-label">Highest OI</div>
+                            <div class="quick-stat-value" id="highest-oi">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div>Powered by Virtuoso Crypto • virtuosocrypto.com</div>
+            <div class="update-time">Last updated: <span id="update-time">--</span></div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        if (typeof lucide !== "undefined") { lucide.createIcons(); } else { console.warn("Lucide icons not loaded"); }
+
+        // DEX exchanges list
+        const DEX_EXCHANGES = ['hyperliquid', 'asterdex', 'dydx', 'jupiter', 'drift'];
+
+        // Check if exchange is DEX
+        function isDex(exchange) {
+            return DEX_EXCHANGES.some(dex => exchange.toLowerCase().includes(dex));
+        }
+
+        // Format number helper
+        function formatNumber(num, decimals = 2) {
+            if (num >= 1e9) return `$${(num / 1e9).toFixed(decimals)}B`;
+            if (num >= 1e6) return `$${(num / 1e6).toFixed(decimals)}M`;
+            if (num >= 1e3) return `$${(num / 1e3).toFixed(decimals)}K`;
+            return `$${num.toFixed(decimals)}`;
+        }
+
+        // Format percentage
+        function formatPercent(num, decimals = 2) {
+            return `${(num * 100).toFixed(decimals)}%`;
+        }
+
+        // Calculate relative bar width for visual encoding
+        function calculateBarWidth(value, max, minWidth = 40, maxWidth = 100) {
+            if (max === 0) return minWidth;
+            const ratio = value / max;
+            return minWidth + (ratio * (maxWidth - minWidth));
+        }
+
+        // Fetch and update data
+        async function fetchData() {
+            try {
+                // This would be your actual API endpoint
+                // For now using placeholder - replace with actual endpoint
+                const response = await fetch('/api/markets'); // Replace with actual endpoint
+                const data = await response.json();
+
+                updateStats(data);
+                updateTable(data.markets);
+                updateCharts(data.markets);
+                updateFundingList(data.markets);
+                updateQuickStats(data.markets);
+
+                // Update timestamp
+                document.getElementById('update-time').textContent =
+                    new Date().toLocaleString('en-US', {
+                        timeZone: 'UTC',
+                        dateStyle: 'short',
+                        timeStyle: 'medium'
+                    }) + ' UTC';
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Update header and main stats
+        function updateStats(data) {
+            const totalVolume = data.markets.reduce((sum, m) => sum + (m.volume_24h || 0), 0);
+            const totalOI = data.markets.reduce((sum, m) => sum + (m.open_interest || 0), 0);
+            const exchangeCount = new Set(data.markets.map(m => m.exchange)).size;
+
+            // Calculate weighted average funding
+            let weightedFunding = 0;
+            let totalWeight = 0;
+            data.markets.forEach(m => {
+                if (m.funding_rate && m.volume_24h) {
+                    weightedFunding += m.funding_rate * m.volume_24h;
+                    totalWeight += m.volume_24h;
+                }
+            });
+            const avgFunding = totalWeight > 0 ? (weightedFunding / totalWeight) * 100 : 0;
+
+            // Update header
+            document.getElementById('header-volume').textContent = formatNumber(totalVolume, 1);
+            document.getElementById('header-oi').textContent = formatNumber(totalOI, 1);
+            document.getElementById('header-exchanges').textContent = exchangeCount;
+            document.getElementById('header-funding').textContent = avgFunding.toFixed(3) + '%';
+
+            // Update stat cards
+            document.getElementById('stat-volume').textContent = formatNumber(totalVolume, 1);
+            document.getElementById('stat-oi').textContent = formatNumber(totalOI, 1);
+            document.getElementById('stat-exchanges').textContent = exchangeCount;
+            document.getElementById('stat-funding').textContent = avgFunding.toFixed(3) + '%';
+        }
+
+        // Update market data table with visual encoding
+        function updateTable(markets) {
+            const tbody = document.getElementById('market-table-body');
+            tbody.innerHTML = '';
+
+            // Group by exchange
+            const exchangeData = {};
+            markets.forEach(m => {
+                if (!exchangeData[m.exchange]) {
+                    exchangeData[m.exchange] = {
+                        exchange: m.exchange,
+                        volume: 0,
+                        oi: 0,
+                        funding: [],
+                        markets: 0
+                    };
+                }
+                exchangeData[m.exchange].volume += m.volume_24h || 0;
+                exchangeData[m.exchange].oi += m.open_interest || 0;
+                if (m.funding_rate) exchangeData[m.exchange].funding.push(m.funding_rate);
+                exchangeData[m.exchange].markets += 1;
+            });
+
+            // Convert to array and sort by volume
+            const exchanges = Object.values(exchangeData)
+                .sort((a, b) => b.volume - a.volume);
+
+            // Find max values for bar scaling
+            const maxVolume = Math.max(...exchanges.map(e => e.volume));
+            const maxOI = Math.max(...exchanges.map(e => e.oi));
+
+            exchanges.forEach(ex => {
+                const avgFunding = ex.funding.length > 0
+                    ? ex.funding.reduce((a, b) => a + b) / ex.funding.length
+                    : 0;
+
+                const volumeBarWidth = calculateBarWidth(ex.volume, maxVolume);
+                const oiBarWidth = calculateBarWidth(ex.oi, maxOI);
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight: 600;">${ex.exchange}</td>
+                    <td>
+                        <span class="tag tag-${isDex(ex.exchange) ? 'dex' : 'cex'}">
+                            ${isDex(ex.exchange) ? 'DEX' : 'CEX'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="value-with-bar">
+                            <span class="number-large">${formatNumber(ex.volume, 2)}</span>
+                            <div class="mini-bar" style="width: ${volumeBarWidth}px;"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="value-with-bar">
+                            <span class="number-large">${formatNumber(ex.oi, 2)}</span>
+                            <div class="mini-bar" style="width: ${oiBarWidth}px;"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="funding-rate ${avgFunding > 0 ? 'positive' : avgFunding < 0 ? 'negative' : 'neutral'}">
+                            ${(avgFunding * 100).toFixed(4)}%
+                        </span>
+                    </td>
+                    <td class="number-large">${ex.markets}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Update DEX vs CEX chart
+        function updateCharts(markets) {
+            let cexVolume = 0;
+            let dexVolume = 0;
+
+            markets.forEach(m => {
+                if (isDex(m.exchange)) {
+                    dexVolume += m.volume_24h || 0;
+                } else {
+                    cexVolume += m.volume_24h || 0;
+                }
+            });
+
+            const total = cexVolume + dexVolume;
+            const cexPct = total > 0 ? (cexVolume / total) * 100 : 0;
+            const dexPct = total > 0 ? (dexVolume / total) * 100 : 0;
+
+            const data = [{
+                values: [cexPct, dexPct],
+                labels: ['CEX', 'DEX'],
+                type: 'pie',
+                marker: {
+                    colors: ['#fbbf24', '#06B6D4']
+                },
+                textinfo: 'label+percent',
+                textfont: {
+                    size: 13,
+                    family: 'IBM Plex Mono, monospace',
+                    color: '#0a0a0a'
+                },
+                hoverinfo: 'label+percent+value',
+                hole: 0.45
+            }];
+
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {
+                    color: '#e0e0e0',
+                    family: 'Inter, sans-serif',
+                    size: 12
+                },
+                showlegend: true,
+                legend: {
+                    font: {
+                        color: '#9ca3af',
+                        size: 11
+                    },
+                    orientation: 'h',
+                    y: -0.1
+                },
+                margin: { t: 10, b: 40, l: 10, r: 10 },
+                height: 240
+            };
+
+            const config = {
+                displayModeBar: false,
+                responsive: true
+            };
+
+            Plotly.newPlot('dex-cex-chart', data, layout, config);
+        }
+
+        // Update funding rates list
+        function updateFundingList(markets) {
+            const fundingList = document.getElementById('funding-list');
+
+            // Get markets with funding rates and sort
+            const withFunding = markets
+                .filter(m => m.funding_rate !== null && m.funding_rate !== undefined)
+                .sort((a, b) => Math.abs(b.funding_rate) - Math.abs(a.funding_rate))
+                .slice(0, 10);
+
+            fundingList.innerHTML = '';
+
+            withFunding.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'funding-item';
+                const fundingRate = (m.funding_rate * 100).toFixed(4);
+                const rateClass = m.funding_rate > 0 ? 'positive' : 'negative';
+
+                div.innerHTML = `
+                    <div class="funding-item-info">
+                        <div class="funding-item-symbol">${m.symbol || 'N/A'}</div>
+                        <div class="funding-item-exchange">${m.exchange}</div>
+                    </div>
+                    <div class="funding-item-rate ${rateClass}">${fundingRate}%</div>
+                `;
+                fundingList.appendChild(div);
+            });
+        }
+
+        // Update quick stats
+        function updateQuickStats(markets) {
+            let cexVolume = 0;
+            let dexVolume = 0;
+            const exchangeStats = {};
+
+            markets.forEach(m => {
+                if (isDex(m.exchange)) {
+                    dexVolume += m.volume_24h || 0;
+                } else {
+                    cexVolume += m.volume_24h || 0;
+                }
+
+                if (!exchangeStats[m.exchange]) {
+                    exchangeStats[m.exchange] = { volume: 0, oi: 0 };
+                }
+                exchangeStats[m.exchange].volume += m.volume_24h || 0;
+                exchangeStats[m.exchange].oi += m.open_interest || 0;
+            });
+
+            const total = cexVolume + dexVolume;
+            const cexPct = total > 0 ? (cexVolume / total) * 100 : 0;
+            const dexPct = total > 0 ? (dexVolume / total) * 100 : 0;
+
+            const exchanges = Object.entries(exchangeStats);
+            const highestVolume = exchanges.sort((a, b) => b[1].volume - a[1].volume)[0];
+            const highestOI = exchanges.sort((a, b) => b[1].oi - a[1].oi)[0];
+
+            document.getElementById('cex-dominance').textContent = cexPct.toFixed(1) + '%';
+            document.getElementById('dex-dominance').textContent = dexPct.toFixed(1) + '%';
+            document.getElementById('highest-volume').textContent = highestVolume ? highestVolume[0] : '--';
+            document.getElementById('highest-oi').textContent = highestOI ? highestOI[0] : '--';
+        }
+
+        // Table sorting
+        let currentSort = { column: null, direction: 'desc' };
+
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const sortKey = th.dataset.sort;
+
+                // Toggle direction if clicking same column
+                if (currentSort.column === sortKey) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = sortKey;
+                    currentSort.direction = 'desc';
+                }
+
+                // Visual feedback
+                document.querySelectorAll('.sortable').forEach(t => t.style.color = '');
+                th.style.color = 'var(--neon-amber)';
+
+                // Re-fetch and sort would happen here
+                console.log('Sort by:', sortKey, currentSort.direction);
+            });
+        });
+
+        // Auto-refresh every 2 minutes
+        setInterval(fetchData, 120000);
+
+        // Initial load
+        fetchData();
+    </script>
+</body>
+</html>

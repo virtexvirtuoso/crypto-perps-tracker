@@ -158,7 +158,8 @@ class HyperLiquidClient(BaseExchangeClient):
                     mark_price = float(ctx.get('markPx', 0))
                     prev_price = float(ctx.get('prevDayPx', 0))
 
-                    # Calculate price change
+                    # Calculate 24h price change using prevDayPx (price from 24h ago)
+                    # Returns None if prevDayPx is 0 or missing (API doesn't have historical data)
                     price_change_pct = None
                     if prev_price > 0:
                         price_change_pct = ((mark_price - prev_price) / prev_price) * 100

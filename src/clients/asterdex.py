@@ -81,28 +81,124 @@ class AsterDEXClient(BaseExchangeClient):
             symbol: Trading pair symbol (e.g., 'BTCUSDT')
 
         Returns:
-            SymbolData with price, volume, and available metrics
+            SymbolData with price, volume, funding rate, and open interest
         """
         try:
             # Get ticker data for specific symbol
             response = self._get("/fapi/v1/ticker/24hr", params={"symbol": symbol})
-
-            # Response can be a single object or list with one item
             ticker = response if isinstance(response, dict) else response[0]
+
+            # Get funding rate and open interest from dedicated endpoints
+            funding_rate = None
+            open_interest_usd = None
+
+            try:
+                premium_data = self.fetch_premium_index(symbol)
+                if premium_data:
+                    funding_rate = premium_data.get('funding_rate')
+            except Exception:
+                pass
+
+            try:
+                oi_data = self.fetch_open_interest(symbol)
+                if oi_data:
+                    # Convert OI from base asset to USD
+                    price = float(ticker.get('lastPrice', 0))
+                    oi_base = float(oi_data.get('open_interest', 0))
+                    open_interest_usd = oi_base * price
+            except Exception:
+                pass
 
             return SymbolData(
                 exchange=self.exchange_type,
                 symbol=symbol,
                 price=float(ticker.get('lastPrice', 0)),
                 volume_24h=float(ticker.get('quoteVolume', 0)),
-                price_change_24h=float(ticker.get('priceChange', 0)),
-                price_change_pct=float(ticker.get('priceChangePercent', 0)),
-                high_24h=float(ticker.get('highPrice', 0)),
-                low_24h=float(ticker.get('lowPrice', 0)),
-                trades_24h=int(ticker.get('count', 0)),
-                open_interest=None,  # Not in ticker endpoint
-                funding_rate=None    # Not in ticker endpoint
+                price_change_24h_pct=float(ticker.get('priceChangePercent', 0)),
+                open_interest=open_interest_usd,
+                funding_rate=funding_rate,
+                num_trades=int(ticker.get('count', 0))
             )
-        except Exception as e:
-            self._logger.error(f"Error fetching symbol {symbol}: {e}")
+        except Exception:
+            return None
+
+    def fetch_premium_index(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetch premium index and funding rate for a symbol
+
+        Uses Binance-compatible /fapi/v1/premiumIndex endpoint.
+
+        Args:
+            symbol: Trading pair symbol (e.g., 'BTCUSDT')
+
+        Returns:
+            Dict with mark price, index price, funding rate, and next funding time
+        """
+        try:
+            response = self._get("/fapi/v1/premiumIndex", params={"symbol": symbol})
+
+            return {
+                'symbol': response.get('symbol'),
+                'mark_price': float(response.get('markPrice', 0)),
+                'index_price': float(response.get('indexPrice', 0)),
+                'funding_rate': float(response.get('lastFundingRate', 0)),
+                'next_funding_time': response.get('nextFundingTime'),
+                'interest_rate': float(response.get('interestRate', 0)),
+                'timestamp': response.get('time')
+            }
+        except Exception:
+            return None
+
+    def fetch_open_interest(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetch open interest for a symbol
+
+        Uses Binance-compatible /fapi/v1/openInterest endpoint.
+
+        Args:
+            symbol: Trading pair symbol (e.g., 'BTCUSDT')
+
+        Returns:
+            Dict with open interest in base asset
+        """
+        try:
+            response = self._get("/fapi/v1/openInterest", params={"symbol": symbol})
+
+            return {
+                'symbol': response.get('symbol'),
+                'open_interest': float(response.get('openInterest', 0)),
+                'timestamp': response.get('time')
+            }
+        except Exception:
+            return None
+
+    def fetch_funding_rate_history(
+        self,
+        symbol: str,
+        limit: int = 1
+    ) -> Optional[list]:
+        """Fetch funding rate history for a symbol
+
+        Args:
+            symbol: Trading pair symbol (e.g., 'BTCUSDT')
+            limit: Number of records to fetch (default: 1)
+
+        Returns:
+            List of funding rate records
+        """
+        try:
+            response = self._get(
+                "/fapi/v1/fundingRate",
+                params={"symbol": symbol, "limit": limit}
+            )
+
+            if isinstance(response, list):
+                return [
+                    {
+                        'symbol': r.get('symbol'),
+                        'funding_rate': float(r.get('fundingRate', 0)),
+                        'funding_time': r.get('fundingTime')
+                    }
+                    for r in response
+                ]
+            return None
+        except Exception:
             return None

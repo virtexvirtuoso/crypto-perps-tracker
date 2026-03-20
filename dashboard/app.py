@@ -43,9 +43,244 @@ app = dash.Dash(
     suppress_callback_exceptions=True
 )
 
+# Expose Flask server for Gunicorn
+server = app.server
+
 # Initialize Container for data fetching
 config = Config.from_yaml('config/config.yaml')
 container = Container(config)
+
+# Add health check endpoint
+@server.route('/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        import sqlite3
+        from flask import jsonify
+
+        # Check database
+        db_path = 'data/market_history.db'
+        if not Path(db_path).exists():
+            return jsonify({'status': 'unhealthy', 'error': 'Database not found'}), 503
+
+        conn = sqlite3.connect(db_path)
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+
+        # Check container init
+        _ = container.exchange_service
+
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'service': 'dashboard'
+        }), 200
+    except Exception as e:
+        from flask import jsonify
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }), 503
+
+
+# Add Perpetuals Pulse API endpoint for Virtuoso dashboard integration
+@server.route('/api/perpetuals-pulse')
+def perpetuals_pulse():
+    """
+    API endpoint providing key perpetual futures metrics for external dashboard integration.
+    Returns: Funding rates, OI, Long/Short ratio, CEX/DEX split, Basis status
+    """
+    from flask import jsonify
+    import traceback
+
+    try:
+        # Fetch market data from all exchanges
+        markets = container.exchange_service.fetch_all_markets()
+
+        if not markets:
+            return jsonify({'error': 'No market data available'}), 503
+
+        # Calculate metrics
+        total_volume = sum(m.volume_24h for m in markets)
+        total_oi = sum(m.open_interest or 0 for m in markets)
+
+        # Volume-weighted average funding rate
+        weighted_funding_sum = 0
+        funding_volume = 0
+        for m in markets:
+            if m.funding_rate is not None and m.volume_24h > 0:
+                weighted_funding_sum += (m.funding_rate * m.volume_24h)
+                funding_volume += m.volume_24h
+
+        avg_funding_rate = (weighted_funding_sum / funding_volume * 100) if funding_volume > 0 else 0
+
+        # Determine funding sentiment
+        if avg_funding_rate > 0.02:
+            funding_sentiment = "BULLISH"
+            funding_strength = "STRONG" if avg_funding_rate > 0.05 else "MODERATE"
+        elif avg_funding_rate < -0.02:
+            funding_sentiment = "BEARISH"
+            funding_strength = "STRONG" if avg_funding_rate < -0.05 else "MODERATE"
+        else:
+            funding_sentiment = "NEUTRAL"
+            funding_strength = "WEAK"
+
+        # CEX vs DEX split
+        dex_exchanges = {'hyperliquid', 'asterdex', 'dydx'}
+        # Helper function to check if exchange is DEX (handles variations like "dYdX v4")
+        def is_dex(exchange_name: str) -> bool:
+            name_lower = exchange_name.lower()
+            return any(dex in name_lower for dex in dex_exchanges)
+
+        cex_volume = sum(m.volume_24h for m in markets if not is_dex(m.exchange))
+        dex_volume = sum(m.volume_24h for m in markets if is_dex(m.exchange))
+        cex_pct = (cex_volume / total_volume * 100) if total_volume > 0 else 0
+        dex_pct = (dex_volume / total_volume * 100) if total_volume > 0 else 0
+
+        # Exchange count
+        exchange_count = len(set(m.exchange for m in markets))
+
+        # Fetch Long/Short ratio from multiple exchanges
+        long_pct = 50
+        short_pct = 50
+        ls_sources = []
+
+        # Method 1: OKX API (correct params: ccy not instId)
+        try:
+            import requests
+            okx_resp = requests.get(
+                "https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio",
+                params={"ccy": "BTC"},
+                timeout=5
+            ).json()
+
+            if okx_resp.get('code') == '0' and okx_resp.get('data'):
+                ratio = float(okx_resp['data'][0][1])  # L/S ratio
+                okx_long = ratio / (ratio + 1) * 100
+                okx_short = 100 / (ratio + 1)
+                ls_sources.append({'exchange': 'OKX', 'long': okx_long, 'short': okx_short})
+        except Exception as e:
+            print(f"OKX L/S fetch failed: {e}")
+
+        # Method 2: Binance direct API (more reliable than CCXT)
+        try:
+            binance_resp = requests.get(
+                "https://fapi.binance.com/futures/data/globalLongShortAccountRatio",
+                params={"symbol": "BTCUSDT", "period": "1h", "limit": 1},
+                timeout=5
+            ).json()
+
+            if binance_resp and len(binance_resp) > 0:
+                latest = binance_resp[0]
+                binance_long = float(latest.get('longAccount', 0.5)) * 100
+                binance_short = float(latest.get('shortAccount', 0.5)) * 100
+                ls_sources.append({'exchange': 'Binance', 'long': binance_long, 'short': binance_short})
+        except Exception as e:
+            print(f"Binance L/S fetch failed: {e}")
+
+        # Method 3: Bybit direct API
+        try:
+            bybit_resp = requests.get(
+                "https://api.bybit.com/v5/market/account-ratio",
+                params={"category": "linear", "symbol": "BTCUSDT", "period": "1h", "limit": 1},
+                timeout=5
+            ).json()
+
+            if bybit_resp.get('retCode') == 0 and bybit_resp.get('result', {}).get('list'):
+                latest = bybit_resp['result']['list'][0]
+                bybit_long = float(latest.get('buyRatio', 0.5)) * 100
+                bybit_short = float(latest.get('sellRatio', 0.5)) * 100
+                ls_sources.append({'exchange': 'Bybit', 'long': bybit_long, 'short': bybit_short})
+        except Exception as e:
+            print(f"Bybit L/S fetch failed: {e}")
+
+        # Aggregate L/S from all sources (simple average)
+        if ls_sources:
+            long_pct = sum(s['long'] for s in ls_sources) / len(ls_sources)
+            short_pct = sum(s['short'] for s in ls_sources) / len(ls_sources)
+            print(f"L/S aggregated from {len(ls_sources)} sources: {[s['exchange'] for s in ls_sources]}")
+
+        # Calculate REAL basis using spot vs futures prices
+        basis_pct = 0
+        basis_status = "NEUTRAL"
+        try:
+            # Fetch BTC spot price
+            spot_resp = requests.get(
+                "https://api.binance.com/api/v3/ticker/price",
+                params={"symbol": "BTCUSDT"},
+                timeout=5
+            ).json()
+            spot_price = float(spot_resp.get('price', 0))
+
+            # Fetch BTC perpetual futures price
+            futures_resp = requests.get(
+                "https://fapi.binance.com/fapi/v1/ticker/price",
+                params={"symbol": "BTCUSDT"},
+                timeout=5
+            ).json()
+            futures_price = float(futures_resp.get('price', 0))
+
+            if spot_price > 0 and futures_price > 0:
+                # Basis = (Futures - Spot) / Spot * 100
+                basis_pct = ((futures_price - spot_price) / spot_price) * 100
+
+                # Determine status based on basis
+                if basis_pct > 0.02:  # >0.02% = CONTANGO
+                    basis_status = "CONTANGO"
+                elif basis_pct < -0.02:  # <-0.02% = BACKWARDATION
+                    basis_status = "BACKWARDATION"
+                else:
+                    basis_status = "NEUTRAL"
+
+                print(f"Basis calc: Spot=${spot_price:.2f}, Futures=${futures_price:.2f}, Basis={basis_pct:.4f}%")
+        except Exception as e:
+            print(f"Basis calculation failed: {e}")
+            # Fallback to funding rate proxy
+            if avg_funding_rate > 0.02:
+                basis_status = "CONTANGO"
+                basis_pct = avg_funding_rate * 3
+            elif avg_funding_rate < -0.02:
+                basis_status = "BACKWARDATION"
+                basis_pct = avg_funding_rate * 3
+
+        return jsonify({
+            'status': 'success',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+
+            # Core metrics
+            'total_volume_24h': total_volume,
+            'total_open_interest': total_oi,
+            'exchange_count': exchange_count,
+
+            # Funding rate
+            'funding_rate': round(avg_funding_rate, 4),
+            'funding_sentiment': funding_sentiment,
+            'funding_strength': funding_strength,
+
+            # Long/Short ratio
+            'long_pct': round(long_pct, 1),
+            'short_pct': round(short_pct, 1),
+            'ls_sources': [s['exchange'] for s in ls_sources],
+
+            # CEX/DEX split
+            'cex_pct': round(cex_pct, 1),
+            'dex_pct': round(dex_pct, 1),
+
+            # Basis
+            'basis_status': basis_status,
+            'basis_pct': round(basis_pct, 3),
+        }), 200
+
+    except Exception as e:
+        print(f"Error in perpetuals_pulse: {e}")
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }), 500
+
 
 # Custom CSS for dark orange/gold theme
 app.index_string = '''
@@ -140,17 +375,22 @@ app.layout = html.Div([
         )
     ]),
 
-    # Main Content
-    html.Div(id='tab-content', style={
-        'maxWidth': '1800px',
-        'margin': '0 auto',
-        'padding': '25px 40px'
-    }),
+    # Main Content with Loading Spinner
+    dcc.Loading(
+        id="loading-content",
+        type="cube",
+        color="#FFA500",
+        children=html.Div(id='tab-content', style={
+            'maxWidth': '1800px',
+            'margin': '0 auto',
+            'padding': '25px 40px'
+        })
+    ),
 
-    # Auto-refresh interval (60 seconds)
+    # Auto-refresh interval (120 seconds)
     dcc.Interval(
         id='interval-component',
-        interval=60*1000,  # 60 seconds in milliseconds
+        interval=120*1000,  # 120 seconds in milliseconds
         n_intervals=0
     ),
 
@@ -281,8 +521,8 @@ def render_content(tab, n):
 
     elif tab == 'symbol-analysis':
         try:
-            # Get comprehensive symbol analytics
-            analyses = get_symbol_analytics(container, top_n=15)
+            # Get comprehensive symbol analytics (Phase 3: increased to 30 with database caching)
+            analyses = get_symbol_analytics(container, top_n=30)
             summary = get_market_summary(analyses)
             arb_opps = get_arbitrage_opportunities(analyses, min_spread=0.2)
 
@@ -313,12 +553,21 @@ def render_content(tab, n):
 
             # Top Symbols Table
             symbols_table_data = []
-            for i, a in enumerate(analyses[:10], 1):
+            for i, a in enumerate(analyses, 1):  # Show all 30 symbols
                 volume_str = f"${a['total_volume_24h']/1e9:.2f}B" if a['total_volume_24h'] > 1e9 else f"${a['total_volume_24h']/1e6:.0f}M"
                 oi_str = f"${a['total_open_interest']/1e9:.2f}B" if a['total_open_interest'] > 1e9 else f"${a['total_open_interest']/1e6:.0f}M"
                 funding_str = f"{a['avg_funding_rate']:.3f}%" if a.get('avg_funding_rate') is not None else "N/A"
                 change_str = f"{a['avg_price_change_24h']:+.1f}%" if a.get('avg_price_change_24h') is not None else "N/A"
-                change_color = '#00ff88' if a.get('avg_price_change_24h', 0) > 0 else '#ff6b6b'
+
+                # Null-safe color handling for price change
+                price_change = a.get('avg_price_change_24h')
+                if price_change is None:
+                    change_color = '#888888'  # Gray for N/A
+                elif price_change > 0:
+                    change_color = '#00ff88'  # Green for positive
+                else:
+                    change_color = '#ff6b6b'  # Red for negative
+
                 beta_str = f"{a['btc_beta']:.2f}" if a.get('btc_beta') is not None else "N/A"
 
                 symbols_table_data.append(html.Tr([
@@ -351,8 +600,8 @@ def render_content(tab, n):
             ], style={'width': '100%', 'borderCollapse': 'collapse', 'fontSize': '0.9em'})
 
             # Create charts
-            # 1. Bitcoin Beta Chart
-            beta_analyses = [a for a in analyses[:15] if a.get('btc_beta') is not None]
+            # 1. Bitcoin Beta Chart (show all available)
+            beta_analyses = [a for a in analyses if a.get('btc_beta') is not None]
             if beta_analyses:
                 beta_symbols = [a['symbol'] for a in beta_analyses]
                 beta_values = [a['btc_beta'] for a in beta_analyses]
@@ -382,9 +631,9 @@ def render_content(tab, n):
             else:
                 beta_chart = html.Div()
 
-            # 2. Volume Comparison Chart
-            vol_symbols = [a['symbol'] for a in analyses[:12]]
-            vol_values = [a['total_volume_24h']/1e9 for a in analyses[:12]]
+            # 2. Volume Comparison Chart (show all available)
+            vol_symbols = [a['symbol'] for a in analyses]
+            vol_values = [a['total_volume_24h']/1e9 for a in analyses]
 
             vol_fig = go.Figure([
                 go.Bar(
@@ -396,7 +645,7 @@ def render_content(tab, n):
                 )
             ])
             vol_fig.update_layout(
-                title='Top 12 Symbols by 24h Volume',
+                title=f'Top {len(analyses)} Symbols by 24h Volume',
                 paper_bgcolor='#0a0a0a',
                 plot_bgcolor='#1a1a1a',
                 font={'color': '#FFD700', 'family': 'Courier New'},
@@ -407,8 +656,8 @@ def render_content(tab, n):
             )
             vol_chart = dcc.Graph(figure=vol_fig, config={'displayModeBar': False})
 
-            # 3. Funding Rate Chart
-            funding_analyses = [a for a in analyses[:12] if a.get('avg_funding_rate') is not None]
+            # 3. Funding Rate Chart (show all available)
+            funding_analyses = [a for a in analyses if a.get('avg_funding_rate') is not None]
             if funding_analyses:
                 funding_symbols = [a['symbol'] for a in funding_analyses]
                 funding_rates = [a['avg_funding_rate'] for a in funding_analyses]
@@ -453,10 +702,9 @@ def render_content(tab, n):
                 ])
             ]) if arb_opps else html.Div()
 
-            # Generate Interactive 12h Performance Chart (with 5-min cache)
-            performance_chart_section = html.Div()
+            # PERFORMANCE CHART - Now with database caching (Phase 3)
             try:
-                chart_data = get_performance_chart_plotly(container, analyses, top_n=30)
+                chart_data = get_performance_chart_plotly(container, analyses, top_n=20)
                 if chart_data:
                     # Create Plotly figure
                     fig = go.Figure()
@@ -481,15 +729,19 @@ def render_content(tab, n):
                             'font': {'size': 16, 'color': '#FFA500', 'family': 'Arial Black'}
                         },
                         xaxis={
-                            'title': 'Time (12h Period)',
-                            'titlefont': {'color': '#FFD700', 'size': 12},
+                            'title': {
+                                'text': 'Time (12h Period)',
+                                'font': {'color': '#FFD700', 'size': 12}
+                            },
                             'tickfont': {'color': '#FFD700', 'size': 10},
                             'gridcolor': 'rgba(255, 215, 0, 0.08)',
                             'showgrid': True
                         },
                         yaxis={
-                            'title': 'Price Change (%)',
-                            'titlefont': {'color': '#FFD700', 'size': 12},
+                            'title': {
+                                'text': 'Price Change (%)',
+                                'font': {'color': '#FFD700', 'size': 12}
+                            },
                             'tickfont': {'color': '#FFD700', 'size': 10},
                             'gridcolor': 'rgba(255, 215, 0, 0.08)',
                             'showgrid': True,
@@ -518,8 +770,9 @@ def render_content(tab, n):
                     )
 
                     performance_chart_section = html.Div([
-                        html.H3('🚀 12-Hour Performance Tracker', style={'color': '#FFA500', 'textAlign': 'center', 'marginBottom': '15px'}),
-                        html.P('Interactive chart: Hover for details • Zoom/Pan • Click legend to toggle symbols • Auto-refresh: 5 minutes',
+                        html.H3('🚀 12-Hour Performance Tracker',
+                               style={'color': '#FFA500', 'textAlign': 'center', 'marginBottom': '15px'}),
+                        html.P('📊 Database-cached for instant loading • Hover for details • Zoom/Pan • Click legend to toggle • Auto-refresh: 10min',
                                style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em', 'marginBottom': '20px'}),
                         dcc.Graph(
                             figure=fig,
@@ -527,19 +780,32 @@ def render_content(tab, n):
                             style={'border': '2px solid #FFA500', 'borderRadius': '8px'}
                         )
                     ], className='dash-graph', style={'marginBottom': '30px'})
+                else:
+                    performance_chart_section = html.Div([
+                        html.H3('⏳ Building Performance History',
+                               style={'color': '#FFA500', 'textAlign': 'center'}),
+                        html.P('Historical data logger is collecting snapshots. Chart will appear after 1 hour of data.',
+                              style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em'})
+                    ], className='dash-graph', style={'padding': '30px', 'marginBottom': '30px'})
             except Exception as e:
                 print(f"⚠️  Could not generate performance chart: {e}")
                 import traceback
                 traceback.print_exc()
+                performance_chart_section = html.Div([
+                    html.H3('❌ Performance Chart Error',
+                           style={'color': '#FF6B6B', 'textAlign': 'center'}),
+                    html.P(f'Error: {str(e)}',
+                          style={'color': '#FDB44B', 'textAlign': 'center', 'fontSize': '0.9em'})
+                ], className='dash-graph', style={'padding': '30px', 'marginBottom': '30px'})
 
             return html.Div([
-                performance_chart_section,  # Performance tracker at the top
-
                 html.Div([
                     exec_summary,
                     html.H4('📈 Top Symbols by Volume', style={'color': '#FFA500', 'marginBottom': '15px'}),
                     symbols_table,
                 ], className='dash-graph'),
+
+                performance_chart_section,  # Performance tracker right after Token Analytics Intel
 
                 html.Div([vol_chart], className='dash-graph', style={'marginTop': '20px'}),
 
@@ -547,7 +813,7 @@ def render_content(tab, n):
 
                 html.Div([funding_chart], className='dash-graph', style={'marginTop': '20px'}),
 
-                html.Div([arb_section], className='dash-graph', style={'marginTop': '20px'})
+                html.Div([arb_section], className='dash-graph', style={'marginTop': '20px'}),
             ])
 
         except Exception as e:
@@ -711,20 +977,26 @@ def render_content(tab, n):
 def update_time(n):
     """Update last refresh time"""
     now = datetime.now(timezone.utc)
-    next_refresh = 60 - now.second
+    # Calculate seconds until next 2-minute interval
+    next_refresh = 120 - (now.second + (now.minute % 2) * 60)
     return [
         html.Span('● ', style={'color': '#00ff00'}),
         f"Last Update: {now.strftime('%b %d, %H:%M:%S UTC')} • Auto-refresh in {next_refresh}s"
     ]
 
 if __name__ == '__main__':
+    import os
+
     print("\n🚀 Starting Crypto Perps Dashboard...")
     print("📊 Access at: http://localhost:8050")
-    print("⏱️  Auto-refresh: 60 seconds")
+    print("⏱️  Auto-refresh: 120 seconds")
     print("\nPress Ctrl+C to stop\n")
 
+    # Use debug mode only in development
+    debug_mode = os.getenv('DASH_DEBUG', 'false').lower() == 'true'
+
     app.run(
-        debug=True,
+        debug=debug_mode,
         host='0.0.0.0',
         port=8050
     )

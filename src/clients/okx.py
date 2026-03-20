@@ -1,6 +1,7 @@
 """OKX exchange client"""
 
-from typing import List
+from typing import List, Dict, Any
+from datetime import datetime
 from src.clients.base import BaseExchangeClient
 from src.models.market import MarketData, ExchangeType, TradingPair, SymbolData
 
@@ -10,6 +11,11 @@ class OKXClient(BaseExchangeClient):
 
     Fetches trading volume, open interest, and market data from
     OKX SWAP (perpetual) markets.
+
+    API Endpoints:
+        - /api/v5/market/tickers - Market tickers
+        - /api/v5/public/funding-rate - Funding rates
+        - /api/v5/rubik/stat/contracts/long-short-account-ratio - L/S ratio
     """
 
     @property
@@ -217,3 +223,227 @@ class OKXClient(BaseExchangeClient):
             )
         except Exception:
             return None
+
+    def fetch_long_short_ratio(
+        self,
+        currency: str = "BTC",
+        period: str = "1H"
+    ) -> Dict[str, Any]:
+        """Fetch long/short account ratio from OKX
+
+        Args:
+            currency: Currency (e.g., 'BTC', 'ETH')
+            period: Time period (5m, 1H, 1D)
+
+        Returns:
+            Dict with long/short ratio data:
+                - symbol: Trading pair
+                - long_short_ratio: Ratio of longs to shorts
+                - long_account_pct: Percentage of long accounts
+                - short_account_pct: Percentage of short accounts
+                - timestamp: Data timestamp
+
+        Raises:
+            ValueError: If API returns error
+            requests.RequestException: If request fails
+        """
+        response = self._get(
+            "/api/v5/rubik/stat/contracts/long-short-account-ratio",
+            params={
+                "ccy": currency,
+                "period": period
+            }
+        )
+
+        if response.get('code') != '0':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No long/short ratio data for {currency}")
+
+        # OKX returns [timestamp, ratio] format
+        latest = data[0]
+        timestamp = int(latest[0])
+        ratio = float(latest[1])
+
+        # OKX ratio is long/short directly
+        # Calculate percentages
+        long_pct = ratio / (ratio + 1)
+        short_pct = 1 / (ratio + 1)
+
+        return {
+            'symbol': f"{currency}USDT",
+            'timestamp': datetime.fromtimestamp(timestamp / 1000),
+            'long_short_ratio': ratio,
+            'long_account_pct': long_pct * 100,
+            'short_account_pct': short_pct * 100,
+            'source': 'okx'
+        }
+
+    def fetch_open_interest(
+        self,
+        symbol: str = "BTC-USDT-SWAP"
+    ) -> Dict[str, Any]:
+        """Fetch current open interest for a symbol
+
+        Args:
+            symbol: Trading pair (e.g., 'BTC-USDT-SWAP')
+
+        Returns:
+            Dict with open interest data
+        """
+        response = self._get(
+            "/api/v5/public/open-interest",
+            params={"instId": symbol}
+        )
+
+        if response.get('code') != '0':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No open interest data for {symbol}")
+
+        item = data[0]
+
+        return {
+            'symbol': symbol,
+            'open_interest_contracts': float(item.get('oi', 0)),
+            'open_interest_usd': float(item.get('oiUsd', 0)),
+            'timestamp': datetime.fromtimestamp(int(item.get('ts', 0)) / 1000),
+            'source': 'okx'
+        }
+
+    def fetch_open_interest_history(
+        self,
+        currency: str = "BTC",
+        period: str = "1H"
+    ) -> Dict[str, Any]:
+        """Fetch historical open interest data
+
+        Args:
+            currency: Currency (e.g., 'BTC')
+            period: Time period (5m, 1H, 1D)
+
+        Returns:
+            Dict with open interest history
+        """
+        response = self._get(
+            "/api/v5/rubik/stat/contracts/open-interest-volume",
+            params={
+                "ccy": currency,
+                "period": period
+            }
+        )
+
+        if response.get('code') != '0':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No OI history for {currency}")
+
+        # OKX returns [timestamp, oi, vol] format
+        latest = data[0]
+
+        return {
+            'symbol': f"{currency}USDT",
+            'timestamp': datetime.fromtimestamp(int(latest[0]) / 1000),
+            'open_interest_usd': float(latest[1]),
+            'volume_usd': float(latest[2]),
+            'source': 'okx'
+        }
+
+    def fetch_taker_volume(
+        self,
+        currency: str = "BTC",
+        period: str = "1H"
+    ) -> Dict[str, Any]:
+        """Fetch taker buy/sell volume
+
+        Args:
+            currency: Currency (e.g., 'BTC')
+            period: Time period (5m, 1H, 1D)
+
+        Returns:
+            Dict with taker volume data
+        """
+        response = self._get(
+            "/api/v5/rubik/stat/taker-volume",
+            params={
+                "ccy": currency,
+                "instType": "CONTRACTS",
+                "period": period
+            }
+        )
+
+        if response.get('code') != '0':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No taker volume data for {currency}")
+
+        # OKX returns [timestamp, sellVol, buyVol] format
+        latest = data[0]
+        sell_vol = float(latest[1])
+        buy_vol = float(latest[2])
+        ratio = buy_vol / sell_vol if sell_vol > 0 else 1.0
+
+        return {
+            'symbol': f"{currency}USDT",
+            'timestamp': datetime.fromtimestamp(int(latest[0]) / 1000),
+            'buy_volume': buy_vol,
+            'sell_volume': sell_vol,
+            'buy_sell_ratio': ratio,
+            'net_volume': buy_vol - sell_vol,
+            'aggressor': 'buyers' if ratio > 1 else 'sellers' if ratio < 1 else 'neutral',
+            'source': 'okx'
+        }
+
+    def fetch_liquidations(
+        self,
+        currency: str = "BTC",
+        period: str = "1H"
+    ) -> Dict[str, Any]:
+        """Fetch liquidation data
+
+        Args:
+            currency: Currency (e.g., 'BTC')
+            period: Time period (5m, 1H, 1D)
+
+        Returns:
+            Dict with liquidation summary
+        """
+        response = self._get(
+            "/api/v5/rubik/stat/contracts/liquidation",
+            params={
+                "ccy": currency,
+                "period": period
+            }
+        )
+
+        if response.get('code') != '0':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No liquidation data for {currency}")
+
+        # Sum recent liquidations
+        total_long_liq = 0
+        total_short_liq = 0
+
+        for item in data[:24]:  # Last 24 periods
+            total_long_liq += float(item[1]) if len(item) > 1 else 0
+            total_short_liq += float(item[2]) if len(item) > 2 else 0
+
+        return {
+            'symbol': f"{currency}USDT",
+            'long_liquidations_usd': total_long_liq,
+            'short_liquidations_usd': total_short_liq,
+            'total_liquidations_usd': total_long_liq + total_short_liq,
+            'liquidation_ratio': total_long_liq / total_short_liq if total_short_liq > 0 else 1.0,
+            'source': 'okx'
+        }

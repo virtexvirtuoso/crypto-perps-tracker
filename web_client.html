@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Derivatives Signals Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .controls select, .controls button {
+            padding: 12px 20px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .controls select {
+            background: white;
+            color: #333;
+        }
+
+        .controls button {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .controls button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .controls button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .signal-card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .signal-title {
+            font-size: 1.8em;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .signal-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .recommendation {
+            font-size: 2.5em;
+            font-weight: bold;
+            text-align: center;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .recommendation.long {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .recommendation.short {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            color: white;
+        }
+
+        .recommendation.neutral {
+            background: linear-gradient(135deg, #bdc3c7 0%, #95a5a6 100%);
+            color: white;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .metric {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .score-breakdown {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .score-value.positive {
+            color: #38ef7d;
+        }
+
+        .score-value.negative {
+            color: #f45c43;
+        }
+
+        .score-value.neutral {
+            color: #95a5a6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .error {
+            background: #f45c43;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background: #38ef7d;
+            color: white;
+        }
+
+        .status.disconnected {
+            background: #f45c43;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Derivatives Signals Dashboard</h1>
+            <p class="subtitle">Real-time trading signals from Bybit V5</p>
+        </header>
+
+        <div class="controls">
+            <select id="symbolSelect">
+                <option value="BTCUSDT">BTC/USDT</option>
+                <option value="ETHUSDT">ETH/USDT</option>
+                <option value="SOLUSDT">SOL/USDT</option>
+                <option value="BNBUSDT">BNB/USDT</option>
+                <option value="XRPUSDT">XRP/USDT</option>
+            </select>
+            <button id="fetchButton">Get Signal</button>
+            <button id="wsButton">Start Live Stream</button>
+            <span id="wsStatus" class="status disconnected">Disconnected</span>
+        </div>
+
+        <div id="signalContainer">
+            <div class="loading">Select a symbol and click "Get Signal" to begin</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        const WS_URL = 'ws://localhost:8000';
+        let ws = null;
+        let currentSymbol = 'BTCUSDT';
+
+        const symbolSelect = document.getElementById('symbolSelect');
+        const fetchButton = document.getElementById('fetchButton');
+        const wsButton = document.getElementById('wsButton');
+        const wsStatus = document.getElementById('wsStatus');
+        const signalContainer = document.getElementById('signalContainer');
+
+        symbolSelect.addEventListener('change', (e) => {
+            currentSymbol = e.target.value;
+        });
+
+        fetchButton.addEventListener('click', fetchSignal);
+        wsButton.addEventListener('click', toggleWebSocket);
+
+        async function fetchSignal() {
+            try {
+                signalContainer.innerHTML = '<div class="loading">Loading signal...</div>';
+                fetchButton.disabled = true;
+
+                const response = await fetch(`${API_URL}/signals/fusion/${currentSymbol}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displaySignal(data.signal);
+                } else {
+                    showError(data.error);
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                fetchButton.disabled = false;
+            }
+        }
+
+        function displaySignal(signal) {
+            const direction = signal.direction.toLowerCase();
+            const timestamp = new Date(signal.timestamp).toLocaleString();
+
+            const html = `
+                <div class="signal-card">
+                    <div class="signal-header">
+                        <div class="signal-title">${signal.symbol}</div>
+                        <div class="signal-time">${timestamp}</div>
+                    </div>
+
+                    <div class="recommendation ${direction}">
+                        ${signal.entry_recommendation}
+                    </div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">Score</div>
+                            <div class="metric-value">${signal.score > 0 ? '+' : ''}${signal.score}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Confidence</div>
+                            <div class="metric-value">${signal.confidence.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Win Rate</div>
+                            <div class="metric-value">${signal.win_rate_estimate.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Horizon</div>
+                            <div class="metric-value" style="font-size: 1.2em;">${signal.horizon}</div>
+                        </div>
+                    </div>
+
+                    <div class="score-breakdown">
+                        <div class="score-item">
+                            <div class="score-label">Funding</div>
+                            <div class="score-value ${getScoreClass(signal.funding_contribution)}">
+                                ${signal.funding_contribution > 0 ? '+' : ''}${signal.funding_contribution}
+                            </div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">OI</div>
+                            <div class="score-value ${getScoreClass(signal.oi_contribution)}">
+                                ${signal.oi_contribution > 0 ? '+' : ''}${signal.oi_contribution}
+                            </div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">LSR</div>
+                            <div class="score-value ${getScoreClass(signal.lsr_contribution)}">
+                                ${signal.lsr_contribution > 0 ? '+' : ''}${signal.lsr_contribution}
+                            </div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">CVD</div>
+                            <div class="score-value ${getScoreClass(signal.cvd_contribution)}">
+                                ${signal.cvd_contribution > 0 ? '+' : ''}${signal.cvd_contribution}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            signalContainer.innerHTML = html;
+        }
+
+        function getScoreClass(score) {
+            if (score > 0) return 'positive';
+            if (score < 0) return 'negative';
+            return 'neutral';
+        }
+
+        function toggleWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                wsButton.textContent = 'Start Live Stream';
+            } else {
+                startWebSocket();
+                wsButton.textContent = 'Stop Live Stream';
+            }
+        }
+
+        function startWebSocket() {
+            ws = new WebSocket(`${WS_URL}/ws/signals/${currentSymbol}?signal_type=fusion&interval=60`);
+
+            ws.onopen = () => {
+                wsStatus.textContent = 'Connected';
+                wsStatus.className = 'status connected';
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'signal_update' && data.signals && data.signals.fusion) {
+                    displaySignal(data.signals.fusion);
+                }
+            };
+
+            ws.onclose = () => {
+                wsStatus.textContent = 'Disconnected';
+                wsStatus.className = 'status disconnected';
+                wsButton.textContent = 'Start Live Stream';
+            };
+
+            ws.onerror = (error) => {
+                showError('WebSocket error: ' + error);
+                ws.close();
+            };
+        }
+
+        function showError(message) {
+            signalContainer.innerHTML = `
+                <div class="error">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

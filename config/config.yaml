@@ -3,14 +3,15 @@
 
 # Exchanges to monitor
 exchanges:
-  cex:
+  enabled:
     - binance
     - bybit
     - okx
     - bitget
     - gateio
+    - kucoin
+    - kraken
     - coinbase_intx
-  dex:
     - hyperliquid
     - asterdex
     - dydx

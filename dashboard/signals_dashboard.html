@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Trading Signals - Virtuoso Crypto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            /* Brand Colors */
+            --neon-amber: #fbbf24;
+            --neon-cyan: #06B6D4;
+            --neon-red: #ff0066;
+
+            /* Dark Mode Colors */
+            --dark-bg-primary: #0a0a0a;
+            --dark-bg-secondary: #111111;
+            --dark-border: #222222;
+            --dark-text-primary: #e0e0e0;
+            --dark-text-secondary: #9ca3af;
+            --dark-text-tertiary: #6b7280;
+
+            /* Semantic Colors */
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark-bg-primary);
+            color: var(--dark-text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .font-mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* Brand Elements */
+        .neon-text {
+            color: var(--neon-amber);
+            text-shadow: 0 0 10px var(--neon-amber);
+        }
+
+        .neon-border {
+            border: 1px solid var(--neon-amber);
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+        }
+
+        .glow-on-hover {
+            transition: all 0.3s ease;
+        }
+
+        .glow-on-hover:hover {
+            box-shadow: 0 0 30px var(--neon-amber), inset 0 0 10px rgba(251, 191, 36, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Signal Cards */
+        .signal-card {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .signal-card:hover {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+        }
+
+        /* Signal Strength Gauge */
+        .gauge-container {
+            position: relative;
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease, background 0.3s ease;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        /* Color Indicators */
+        .indicator-strong-long {
+            color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .indicator-moderate-long {
+            color: #34d399;
+            background: rgba(52, 211, 153, 0.1);
+        }
+
+        .indicator-weak-long {
+            color: #6ee7b7;
+            background: rgba(110, 231, 183, 0.1);
+        }
+
+        .indicator-neutral {
+            color: var(--dark-text-secondary);
+            background: rgba(156, 163, 175, 0.1);
+        }
+
+        .indicator-weak-short {
+            color: #fca5a5;
+            background: rgba(252, 165, 165, 0.1);
+        }
+
+        .indicator-moderate-short {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.1);
+        }
+
+        .indicator-strong-short {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Action Badge */
+        .action-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .action-enter-long {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .action-enter-short {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .action-consider {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--neon-amber);
+            border: 1px solid var(--neon-amber);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+        }
+
+        .action-wait {
+            background: rgba(156, 163, 175, 0.1);
+            color: var(--dark-text-secondary);
+            border: 1px solid var(--dark-border);
+        }
+
+        /* Score Breakdown Bars */
+        .score-bar {
+            height: 6px;
+            border-radius: 3px;
+            transition: all 0.3s ease;
+        }
+
+        .score-positive {
+            background: #10b981;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
+        .score-negative {
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+        }
+
+        .score-neutral {
+            background: var(--dark-text-tertiary);
+        }
+
+        /* Auto-refresh indicator */
+        .refresh-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 100;
+        }
+
+        .refresh-indicator.refreshing {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Grid Layout */
+        .signals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            padding: 1.5rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .signals-grid {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            .refresh-indicator {
+                top: 0.5rem;
+                right: 0.5rem;
+                font-size: 0.65rem;
+                padding: 0.5rem 0.75rem;
+            }
+        }
+
+        /* Header */
+        .header {
+            background: var(--dark-bg-secondary);
+            border-bottom: 1px solid var(--dark-border);
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            margin: 0.5rem 0 0 0;
+            color: var(--dark-text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            color: var(--dark-text-secondary);
+        }
+
+        .loading i {
+            font-size: 3rem;
+            color: var(--neon-amber);
+            margin-bottom: 1rem;
+        }
+
+        /* Error State */
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: var(--error);
+            text-align: center;
+        }
+
+        /* Timestamp */
+        .timestamp {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--dark-text-tertiary);
+            text-align: center;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1 class="neon-text">Live Trading Signals</h1>
+        <p class="font-mono">Real-time crypto perpetuals recommendations</p>
+        <p class="text-sm text-gray-500 mt-2">
+            Showing <span id="symbolCount" class="text-amber-400 font-bold">--</span> of <span id="totalSymbolCount" class="text-amber-400 font-bold">--</span> symbols
+            <button id="toggleAllBtn" onclick="toggleShowAll()" style="display:none; margin-left: 10px; padding: 4px 12px; background: #fbbf24; color: #0a0a0a; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold;">
+                Show All
+            </button>
+        </p>
+    </div>
+
+    <!-- Auto-refresh Indicator -->
+    <div class="refresh-indicator" id="refreshIndicator">
+        <i class="fas fa-sync-alt" id="refreshIcon"></i>
+        <span id="refreshText">Next refresh in <span id="countdown">30</span>s</span>
+    </div>
+
+    <!-- Signals Grid -->
+    <div class="signals-grid" id="signalsGrid">
+        <!-- Loading state -->
+        <div class="loading" style="grid-column: 1 / -1;">
+            <i class="fas fa-spinner spinner"></i>
+            <p>Loading signals...</p>
+        </div>
+    </div>
+
+    <!-- Timestamp -->
+    <div class="timestamp" id="timestamp">
+        Last updated: --
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://5.223.63.4/api';
+        let SYMBOLS = []; // Will be fetched dynamically from API
+        let ALL_SYMBOLS = []; // Store all symbols
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+        const DEFAULT_SYMBOL_LIMIT = 20; // Show top 20 by default for fast loading
+
+        let countdownTimer;
+        let refreshTimer;
+        let countdownSeconds = 30;
+        let showAllSymbols = false; // Toggle for showing all symbols
+
+        // Fetch list of supported symbols from API
+        async function fetchSymbolsList() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/symbols`);
+                const result = await response.json();
+
+                if (result.success && result.symbols) {
+                    ALL_SYMBOLS = result.symbols;
+                    // Start with top 20 symbols for fast initial load
+                    return showAllSymbols ? result.symbols : result.symbols.slice(0, DEFAULT_SYMBOL_LIMIT);
+                }
+                throw new Error('Failed to fetch symbols list');
+            } catch (error) {
+                console.error('Error fetching symbols list:', error);
+                // Fallback to default symbols if API fails
+                return ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'ADAUSDT'];
+            }
+        }
+
+        // Fetch signal for a single symbol
+        async function fetchSignal(symbol) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/recommendation/${symbol}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    return result.data;
+                }
+                throw new Error('API returned unsuccessful response');
+            } catch (error) {
+                console.error(`Error fetching signal for ${symbol}:`, error);
+                return null;
+            }
+        }
+
+        // Fetch all signals
+        async function fetchAllSignals() {
+            const refreshIndicator = document.getElementById('refreshIndicator');
+            const refreshIcon = document.getElementById('refreshIcon');
+
+            refreshIndicator.classList.add('refreshing');
+            refreshIcon.classList.add('spinner');
+
+            const promises = SYMBOLS.map(symbol => fetchSignal(symbol));
+            const signals = await Promise.all(promises);
+
+            refreshIndicator.classList.remove('refreshing');
+            refreshIcon.classList.remove('spinner');
+
+            return signals.filter(signal => signal !== null);
+        }
+
+        // Get color class based on signal strength and direction
+        function getIndicatorClass(signalGrade, action) {
+            if (action.includes('ENTER LONG')) {
+                if (signalGrade.startsWith('A')) return 'indicator-strong-long';
+                if (signalGrade.startsWith('B')) return 'indicator-moderate-long';
+                return 'indicator-weak-long';
+            } else if (action.includes('ENTER SHORT')) {
+                if (signalGrade.startsWith('A')) return 'indicator-strong-short';
+                if (signalGrade.startsWith('B')) return 'indicator-moderate-short';
+                return 'indicator-weak-short';
+            } else if (action.includes('CONSIDER')) {
+                return action.includes('LONG') ? 'indicator-weak-long' : 'indicator-weak-short';
+            }
+            return 'indicator-neutral';
+        }
+
+        // Get action badge class
+        function getActionClass(action) {
+            if (action.includes('ENTER LONG')) return 'action-enter-long';
+            if (action.includes('ENTER SHORT')) return 'action-enter-short';
+            if (action.includes('CONSIDER')) return 'action-consider';
+            return 'action-wait';
+        }
+
+        // Get gauge color based on strength
+        function getGaugeColor(strength) {
+            const value = parseInt(strength);
+            if (value >= 80) return '#10b981'; // Strong green
+            if (value >= 70) return '#34d399'; // Moderate green
+            if (value >= 60) return '#6ee7b7'; // Weak green
+            if (value >= 40) return '#9ca3af'; // Neutral gray
+            if (value >= 30) return '#fca5a5'; // Weak red
+            if (value >= 20) return '#f87171'; // Moderate red
+            return '#ef4444'; // Strong red
+        }
+
+        // Create score breakdown HTML
+        function createScoreBreakdown(scoreBreakdown) {
+            const scores = [
+                { name: 'Funding', value: parseInt(scoreBreakdown.funding_rate.replace('+', '')) },
+                { name: 'OI', value: parseInt(scoreBreakdown.open_interest.replace('+', '')) },
+                { name: 'Ratio', value: parseInt(scoreBreakdown.long_short_ratio.replace('+', '')) },
+                { name: 'CVD', value: parseInt(scoreBreakdown.cvd.replace('+', '')) }
+            ];
+
+            return scores.map(score => {
+                const absValue = Math.abs(score.value);
+                const maxWidth = absValue * 10; // Scale to percentage
+                const colorClass = score.value > 0 ? 'score-positive' :
+                                   score.value < 0 ? 'score-negative' : 'score-neutral';
+
+                return `
+                    <div class="flex items-center justify-between text-xs mb-2">
+                        <span class="font-mono text-gray-400 w-16">${score.name}</span>
+                        <div class="flex-1 mx-2">
+                            <div class="gauge-container">
+                                <div class="score-bar ${colorClass}" style="width: ${maxWidth}%"></div>
+                            </div>
+                        </div>
+                        <span class="font-mono ${score.value > 0 ? 'text-green-400' : score.value < 0 ? 'text-red-400' : 'text-gray-500'} w-8 text-right">
+                            ${score.value > 0 ? '+' : ''}${score.value}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Create signal card HTML
+        function createSignalCard(signal) {
+            const indicatorClass = getIndicatorClass(signal.signal_grade, signal.action);
+            const actionClass = getActionClass(signal.action);
+            const strengthValue = parseInt(signal.signal_strength);
+            const gaugeColor = getGaugeColor(signal.signal_strength);
+
+            return `
+                <div class="signal-card glow-on-hover">
+                    <!-- Symbol Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-xl font-bold font-mono neon-text">${signal.symbol}</h2>
+                            <p class="text-xs text-gray-500 font-mono mt-1">${signal.color_indicator}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-2xl font-bold font-mono ${indicatorClass.replace('indicator-', 'text-')}">${signal.signal_grade.split(' ')[0]}</div>
+                            <div class="text-xs text-gray-500 mt-1">${signal.market_bias}</div>
+                        </div>
+                    </div>
+
+                    <!-- Action Badge -->
+                    <div class="mb-4">
+                        <span class="action-badge ${actionClass}">${signal.action}</span>
+                    </div>
+
+                    <!-- Signal Strength Gauge -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-mono text-gray-400">Signal Strength</span>
+                            <span class="text-sm font-bold font-mono" style="color: ${gaugeColor}">${signal.signal_strength}</span>
+                        </div>
+                        <div class="gauge-container">
+                            <div class="gauge-fill" style="width: ${strengthValue}%; background: ${gaugeColor}; color: ${gaugeColor}"></div>
+                        </div>
+                    </div>
+
+                    <!-- Confidence & Bias -->
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-black/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">Confidence</div>
+                            <div class="text-lg font-bold font-mono">${signal.action_confidence}</div>
+                        </div>
+                        <div class="bg-black/30 rounded-lg p-3">
+                            <div class="text-xs text-gray-500 mb-1">Bias Strength</div>
+                            <div class="text-lg font-bold font-mono">${signal.bias_strength}</div>
+                        </div>
+                    </div>
+
+                    <!-- Score Breakdown -->
+                    <div class="mb-4">
+                        <div class="text-xs font-mono text-gray-400 mb-2">Score Breakdown (Total: ${signal.raw_score})</div>
+                        ${createScoreBreakdown(signal.score_breakdown)}
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="bg-black/30 rounded-lg p-3 border border-gray-800">
+                        <div class="text-sm text-gray-300">${signal.summary}</div>
+                    </div>
+
+                    <!-- Risk Warning -->
+                    ${signal.risk_warning ? `
+                        <div class="mt-3 text-xs text-orange-400 border border-orange-900/50 bg-orange-900/10 rounded-lg p-2">
+                            <i class="fas fa-exclamation-triangle mr-1"></i> ${signal.risk_warning}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Render signals to the grid
+        function renderSignals(signals) {
+            const grid = document.getElementById('signalsGrid');
+
+            if (signals.length === 0) {
+                grid.innerHTML = `
+                    <div class="error" style="grid-column: 1 / -1;">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                        <p>Failed to load signals. Please check your connection and try again.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = signals.map(signal => createSignalCard(signal)).join('');
+
+            // Update timestamp
+            const now = new Date();
+            document.getElementById('timestamp').textContent =
+                `Last updated: ${now.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })}`;
+        }
+
+        // Countdown timer
+        function startCountdown() {
+            countdownSeconds = 30;
+            const countdownElement = document.getElementById('countdown');
+
+            clearInterval(countdownTimer);
+            countdownTimer = setInterval(() => {
+                countdownSeconds--;
+                countdownElement.textContent = countdownSeconds;
+
+                if (countdownSeconds <= 0) {
+                    clearInterval(countdownTimer);
+                }
+            }, 1000);
+        }
+
+        // Toggle between showing top 20 and all symbols
+        async function toggleShowAll() {
+            showAllSymbols = !showAllSymbols;
+            const btn = document.getElementById('toggleAllBtn');
+            btn.textContent = showAllSymbols ? 'Show Top 20' : 'Show All';
+            btn.disabled = true; // Disable during loading
+
+            // Re-fetch with new limit
+            SYMBOLS = await fetchSymbolsList();
+            document.getElementById('symbolCount').textContent = SYMBOLS.length;
+
+            // Show loading state
+            const grid = document.getElementById('signalsGrid');
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mb-4"></div>
+                    <p class="text-gray-400">Loading ${SYMBOLS.length} crypto signals...</p>
+                </div>
+            `;
+
+            // Reload signals
+            await refreshSignals();
+
+            // Re-enable button
+            btn.disabled = false;
+        }
+
+        // Auto-refresh logic
+        async function refreshSignals() {
+            const signals = await fetchAllSignals();
+            renderSignals(signals);
+            startCountdown();
+        }
+
+        // Initialize
+        async function init() {
+            // First, fetch the list of symbols from API
+            SYMBOLS = await fetchSymbolsList();
+
+            // Update symbol counts in header
+            document.getElementById('symbolCount').textContent = SYMBOLS.length;
+            document.getElementById('totalSymbolCount').textContent = ALL_SYMBOLS.length;
+
+            // Show the toggle button if we have more symbols available
+            if (ALL_SYMBOLS.length > DEFAULT_SYMBOL_LIMIT) {
+                document.getElementById('toggleAllBtn').style.display = 'inline-block';
+            }
+
+            // Show loading message with symbol count
+            const grid = document.getElementById('signalsGrid');
+            grid.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mb-4"></div>
+                    <p class="text-gray-400">Loading ${SYMBOLS.length} crypto signals...</p>
+                </div>
+            `;
+
+            // Then fetch and render signals
+            await refreshSignals();
+
+            // Set up auto-refresh
+            refreshTimer = setInterval(refreshSignals, REFRESH_INTERVAL);
+        }
+
+        // Start the app
+        init();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            clearInterval(countdownTimer);
+            clearInterval(refreshTimer);
+        });
+    </script>
+</body>
+</html>

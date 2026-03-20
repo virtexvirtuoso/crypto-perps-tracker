@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Perps Tracker - API Documentation</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-green: #3fb950;
+            --accent-blue: #58a6ff;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .base-url {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin: 2rem 0;
+            display: inline-block;
+        }
+
+        .base-url code {
+            color: var(--accent-green);
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .section {
+            margin: 3rem 0;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-icon {
+            font-size: 1.3rem;
+        }
+
+        .endpoint {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            gap: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .endpoint-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .method {
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .method-get {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--accent-green);
+        }
+
+        .endpoint-path {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .endpoint-desc {
+            color: var(--text-secondary);
+            margin-left: auto;
+            font-size: 0.9rem;
+        }
+
+        .endpoint-details {
+            display: none;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+        }
+
+        .endpoint.expanded .endpoint-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-title {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.9rem;
+        }
+
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .param-table th,
+        .param-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .param-table th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+
+        .param-name {
+            font-family: monospace;
+            color: var(--accent-purple);
+        }
+
+        .param-type {
+            color: var(--accent-orange);
+            font-size: 0.85rem;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .tag-dex {
+            background: rgba(163, 113, 247, 0.2);
+            color: var(--accent-purple);
+        }
+
+        .tag-cex {
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .exchange-item {
+            background: var(--bg-tertiary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .try-it {
+            margin-top: 1rem;
+        }
+
+        .try-btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: opacity 0.2s;
+        }
+
+        .try-btn:hover {
+            opacity: 0.9;
+        }
+
+        .response-area {
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .response-area.visible {
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .json-key { color: var(--accent-purple); }
+        .json-string { color: var(--accent-green); }
+        .json-number { color: var(--accent-orange); }
+        .json-boolean { color: var(--accent-blue); }
+        .json-null { color: var(--text-secondary); }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .endpoint-header {
+                flex-wrap: wrap;
+            }
+
+            .endpoint-desc {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Crypto Perps Tracker API</h1>
+            <p class="subtitle">Real-time perpetual futures market data across 14 exchanges</p>
+            <div class="base-url">
+                Base URL: <code>http://5.223.63.4:8050</code>
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">14</div>
+                <div class="stat-label">Exchanges</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">5</div>
+                <div class="stat-label">DEXs Tracked</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">11</div>
+                <div class="stat-label">API Endpoints</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">~$172B</div>
+                <div class="stat-label">24h Volume</div>
+            </div>
+        </div>
+
+        <!-- Health & Status Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🏥</span>
+                Health & Status
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                    <span class="endpoint-desc">Basic health check</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns basic health status of the dashboard service.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"healthy"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:00:00+00:00"</span>,
+  <span class="json-key">"service"</span>: <span class="json-string">"dashboard"</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/health</span>
+                    <span class="endpoint-desc">API health with exchange count</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns API health status including the number of available exchanges.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"healthy"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:40:53+00:00"</span>,
+  <span class="json-key">"exchanges"</span>: <span class="json-number">14</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/status</span>
+                    <span class="endpoint-desc">Detailed system status</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns comprehensive system status including exchange availability and cache configuration.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"operational"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:40:53+00:00"</span>,
+  <span class="json-key">"exchanges"</span>: {
+    <span class="json-key">"available"</span>: [<span class="json-string">"binance"</span>, <span class="json-string">"bybit"</span>, ...],
+    <span class="json-key">"active"</span>: <span class="json-number">12</span>,
+    <span class="json-key">"total"</span>: <span class="json-number">14</span>
+  },
+  <span class="json-key">"cache"</span>: {
+    <span class="json-key">"ttl"</span>: <span class="json-number">60</span>
+  }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Market Overview Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">📊</span>
+                Market Overview
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/markets</span>
+                    <span class="endpoint-desc">All market data from all exchanges</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns comprehensive market data from all exchanges including volume, open interest, funding rates, and top trading pairs.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:00+00:00"</span>,
+  <span class="json-key">"count"</span>: <span class="json-number">12</span>,
+  <span class="json-key">"markets"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Binance"</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">64682647614.07</span>,
+      <span class="json-key">"open_interest"</span>: <span class="json-number">19876543210.50</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.00007465</span>,
+      <span class="json-key">"market_count"</span>: <span class="json-number">350</span>,
+      <span class="json-key">"top_pairs"</span>: [
+        {<span class="json-key">"symbol"</span>: <span class="json-string">"BTCUSDT"</span>, <span class="json-key">"volume"</span>: <span class="json-number">15000000000</span>}
+      ]
+    }
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/markets/summary</span>
+                    <span class="endpoint-desc">Aggregated market summary</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns aggregated market summary across all exchanges.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:00+00:00"</span>,
+  <span class="json-key">"total_volume_24h"</span>: <span class="json-number">172254413578.76</span>,
+  <span class="json-key">"total_open_interest"</span>: <span class="json-number">50925157264.90</span>,
+  <span class="json-key">"exchange_count"</span>: <span class="json-number">12</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/markets/volume</span>
+                    <span class="endpoint-desc">Total 24h volume</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns total 24-hour trading volume across all exchanges.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:08+00:00"</span>,
+  <span class="json-key">"total_volume_24h"</span>: <span class="json-number">172254413578.76</span>,
+  <span class="json-key">"formatted"</span>: <span class="json-string">"$172.25B"</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/markets/open-interest</span>
+                    <span class="endpoint-desc">Total open interest</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns total open interest across all exchanges.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:51+00:00"</span>,
+  <span class="json-key">"total_open_interest"</span>: <span class="json-number">50925157264.90</span>,
+  <span class="json-key">"formatted"</span>: <span class="json-string">"$50.93B"</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Exchange Data Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🏛️</span>
+                Exchange Data
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/exchanges</span>
+                    <span class="endpoint-desc">List all available exchanges</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns a list of all available exchanges that can be queried.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Available Exchanges</div>
+                        <div class="exchange-grid">
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> Binance</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> Bybit</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> OKX</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> Gate.io</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> Kraken</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> KuCoin</div>
+                            <div class="exchange-item"><span class="tag tag-cex">CEX</span> Coinbase INTX</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> HyperLiquid</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> dYdX</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> Jupiter Perps</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> Drift</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> AsterDEX</div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"count"</span>: <span class="json-number">14</span>,
+  <span class="json-key">"exchanges"</span>: [
+    <span class="json-string">"binance"</span>, <span class="json-string">"bybit"</span>, <span class="json-string">"gateio"</span>, <span class="json-string">"bitget"</span>,
+    <span class="json-string">"okx"</span>, <span class="json-string">"hyperliquid"</span>, <span class="json-string">"dydx"</span>, <span class="json-string">"coinbase_intx"</span>,
+    <span class="json-string">"asterdex"</span>, <span class="json-string">"kraken"</span>, <span class="json-string">"kucoin"</span>, <span class="json-string">"coinbase"</span>,
+    <span class="json-string">"jupiter"</span>, <span class="json-string">"drift"</span>
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/exchanges/{exchange}</span>
+                    <span class="endpoint-desc">Data for a specific exchange</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns detailed market data for a specific exchange.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Path Parameters</div>
+                        <table class="param-table">
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">exchange</span></td>
+                                <td><span class="param-type">string</span></td>
+                                <td>Exchange name (e.g., "hyperliquid", "binance", "drift")</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example: /api/exchanges/hyperliquid</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:55+00:00"</span>,
+  <span class="json-key">"exchange"</span>: <span class="json-string">"HyperLiquid"</span>,
+  <span class="json-key">"volume_24h"</span>: <span class="json-number">7654695514.10</span>,
+  <span class="json-key">"open_interest"</span>: <span class="json-number">6655444751.19</span>,
+  <span class="json-key">"funding_rate"</span>: <span class="json-number">0.0000125</span>,
+  <span class="json-key">"market_count"</span>: <span class="json-number">223</span>,
+  <span class="json-key">"top_pairs"</span>: [
+    {<span class="json-key">"symbol"</span>: <span class="json-string">"BTC"</span>, <span class="json-key">"base"</span>: <span class="json-string">"BTC"</span>, <span class="json-key">"quote"</span>: <span class="json-string">"USD"</span>, <span class="json-key">"volume"</span>: <span class="json-number">3663270748.16</span>},
+    {<span class="json-key">"symbol"</span>: <span class="json-string">"ETH"</span>, <span class="json-key">"base"</span>: <span class="json-string">"ETH"</span>, <span class="json-key">"quote"</span>: <span class="json-string">"USD"</span>, <span class="json-key">"volume"</span>: <span class="json-number">2332377427.63</span>}
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Symbol Lookup Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🔍</span>
+                Symbol Lookup
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/symbol/{symbol}</span>
+                    <span class="endpoint-desc">Cross-exchange symbol data</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns data for a specific symbol across all exchanges where it's available. Useful for comparing prices, volumes, and funding rates.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Path Parameters</div>
+                        <table class="param-table">
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">symbol</span></td>
+                                <td><span class="param-type">string</span></td>
+                                <td>Symbol to lookup (e.g., "BTC", "ETH", "SOL")</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example: /api/symbol/BTC</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:28+00:00"</span>,
+  <span class="json-key">"symbol"</span>: <span class="json-string">"BTC"</span>,
+  <span class="json-key">"exchanges"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"data"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Drift"</span>,
+      <span class="json-key">"symbol"</span>: <span class="json-string">"BTC-PERP"</span>,
+      <span class="json-key">"price"</span>: <span class="json-number">86273.00</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">42494840.54</span>,
+      <span class="json-key">"open_interest"</span>: <span class="json-number">88389763.19</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.001539</span>
+    },
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Jupiter Perps"</span>,
+      <span class="json-key">"symbol"</span>: <span class="json-string">"BTC-PERP"</span>,
+      <span class="json-key">"price"</span>: <span class="json-number">86106.40</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">68655923.22</span>,
+      <span class="json-key">"price_change_24h_pct"</span>: <span class="json-number">-1.97</span>
+    },
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"HyperLiquid"</span>,
+      <span class="json-key">"symbol"</span>: <span class="json-string">"BTC"</span>,
+      <span class="json-key">"price"</span>: <span class="json-number">86086.00</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">3661640147.24</span>,
+      <span class="json-key">"open_interest"</span>: <span class="json-number">1905843102.44</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.0000125</span>
+    }
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- DEX vs CEX Analysis Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">⚖️</span>
+                DEX vs CEX Analysis
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/dex-cex</span>
+                    <span class="endpoint-desc">DEX vs CEX volume/OI breakdown</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns a breakdown of trading volume and open interest between decentralized exchanges (DEX) and centralized exchanges (CEX).</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">DEX Classification</div>
+                        <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">The following are classified as DEXs:</p>
+                        <div class="exchange-grid">
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> HyperLiquid</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> dYdX</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> AsterDEX</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> Jupiter Perps</div>
+                            <div class="exchange-item"><span class="tag tag-dex">DEX</span> Drift</div>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:11+00:00"</span>,
+  <span class="json-key">"cex"</span>: {
+    <span class="json-key">"exchanges"</span>: [<span class="json-string">"Bybit"</span>, <span class="json-string">"Coinbase INTX"</span>, <span class="json-string">"OKX"</span>, <span class="json-string">"KuCoin"</span>, <span class="json-string">"Gate.io"</span>, <span class="json-string">"Binance"</span>, <span class="json-string">"Kraken"</span>],
+    <span class="json-key">"count"</span>: <span class="json-number">7</span>,
+    <span class="json-key">"volume_24h"</span>: <span class="json-number">155968839485.89</span>,
+    <span class="json-key">"open_interest"</span>: <span class="json-number">43707563034.15</span>,
+    <span class="json-key">"volume_pct"</span>: <span class="json-number">90.55</span>,
+    <span class="json-key">"oi_pct"</span>: <span class="json-number">85.83</span>
+  },
+  <span class="json-key">"dex"</span>: {
+    <span class="json-key">"exchanges"</span>: [<span class="json-string">"dYdX v4"</span>, <span class="json-string">"Drift"</span>, <span class="json-string">"AsterDEX"</span>, <span class="json-string">"Jupiter Perps"</span>, <span class="json-string">"HyperLiquid"</span>],
+    <span class="json-key">"count"</span>: <span class="json-number">5</span>,
+    <span class="json-key">"volume_24h"</span>: <span class="json-number">16285574092.87</span>,
+    <span class="json-key">"open_interest"</span>: <span class="json-number">7217594230.75</span>,
+    <span class="json-key">"volume_pct"</span>: <span class="json-number">9.45</span>,
+    <span class="json-key">"oi_pct"</span>: <span class="json-number">14.17</span>
+  },
+  <span class="json-key">"totals"</span>: {
+    <span class="json-key">"volume_24h"</span>: <span class="json-number">172254413578.76</span>,
+    <span class="json-key">"open_interest"</span>: <span class="json-number">50925157264.90</span>
+  }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Funding Rates Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">💰</span>
+                Funding Rates
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/funding</span>
+                    <span class="endpoint-desc">Funding rates from all exchanges</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns funding rates from all exchanges, sorted by rate, with volume-weighted average calculation.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Funding Rate Calculation</div>
+                        <p style="color: var(--text-secondary);">
+                            Annualized % is calculated assuming 8-hour funding intervals:<br>
+                            <code>annualized = funding_rate × 100 × 3 × 365</code>
+                        </p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:41:35+00:00"</span>,
+  <span class="json-key">"average_funding_rate"</span>: <span class="json-number">0.0000527</span>,
+  <span class="json-key">"average_funding_pct"</span>: <span class="json-number">0.00527</span>,
+  <span class="json-key">"exchanges"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Gate.io"</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.000088</span>,
+      <span class="json-key">"funding_rate_pct"</span>: <span class="json-number">0.0088</span>,
+      <span class="json-key">"annualized_pct"</span>: <span class="json-number">9.64</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">21058807349.00</span>
+    },
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Binance"</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.00007465</span>,
+      <span class="json-key">"funding_rate_pct"</span>: <span class="json-number">0.007465</span>,
+      <span class="json-key">"annualized_pct"</span>: <span class="json-number">8.17</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">64682647614.07</span>
+    }
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Virtuoso Integration Section -->
+        <section class="section">
+            <h2 class="section-title">
+                <span class="section-icon">🎯</span>
+                Virtuoso Integration
+            </h2>
+
+            <div class="endpoint" onclick="toggleEndpoint(this)">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/perpetuals-pulse</span>
+                    <span class="endpoint-desc">Comprehensive market pulse for Virtuoso dashboard</span>
+                </div>
+                <div class="endpoint-details">
+                    <div class="detail-section">
+                        <div class="detail-title">Description</div>
+                        <p>Returns comprehensive perpetual futures metrics optimized for the Virtuoso trading dashboard. Includes funding rates, open interest, long/short ratios, CEX/DEX split, and basis calculations.</p>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Key Metrics</div>
+                        <table class="param-table">
+                            <tr>
+                                <th>Metric</th>
+                                <th>Description</th>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">funding_rate</span></td>
+                                <td>Volume-weighted average funding rate across exchanges</td>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">open_interest</span></td>
+                                <td>Total open interest in USD</td>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">long_short_ratio</span></td>
+                                <td>Aggregated from OKX, Binance, Bybit</td>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">dex_volume_pct</span></td>
+                                <td>Percentage of volume on DEXs</td>
+                            </tr>
+                            <tr>
+                                <td><span class="param-name">basis</span></td>
+                                <td>Spot vs Futures price difference</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-title">Example Response</div>
+                        <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-17T22:35:26+00:00"</span>,
+  <span class="json-key">"funding_rate"</span>: <span class="json-number">0.0065</span>,
+  <span class="json-key">"funding_sentiment"</span>: <span class="json-string">"bullish"</span>,
+  <span class="json-key">"open_interest"</span>: <span class="json-number">50925157264.90</span>,
+  <span class="json-key">"oi_change_24h"</span>: <span class="json-number">2.5</span>,
+  <span class="json-key">"long_short_ratio"</span>: <span class="json-number">1.05</span>,
+  <span class="json-key">"dex_volume_pct"</span>: <span class="json-number">9.45</span>,
+  <span class="json-key">"cex_volume_pct"</span>: <span class="json-number">90.55</span>,
+  <span class="json-key">"basis"</span>: <span class="json-number">-0.0545</span>,
+  <span class="json-key">"basis_sentiment"</span>: <span class="json-string">"contango"</span>,
+  <span class="json-key">"exchange_count"</span>: <span class="json-number">12</span>
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Crypto Perps Tracker API • Built with Flask & Dash</p>
+            <p style="margin-top: 0.5rem; font-size: 0.85rem;">
+                Data refreshed every 60 seconds • Last updated: December 2025
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleEndpoint(element) {
+            element.classList.toggle('expanded');
+        }
+
+        // Expand first endpoint in each section by default
+        document.querySelectorAll('.section').forEach(section => {
+            const firstEndpoint = section.querySelector('.endpoint');
+            if (firstEndpoint) {
+                firstEndpoint.classList.add('expanded');
+            }
+        });
+    </script>
+</body>
+</html>

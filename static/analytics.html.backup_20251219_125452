@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtuoso - Perpetuals Analytics Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #fbbf24;
+            --secondary: #06B6D4;
+            --bg-dark: #0a0a0a;
+            --bg-card: #111111;
+            --bg-card-hover: #1a1a1a;
+            --success: #10b981;
+            --error: #ef4444;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a3a3a3;
+            --border: #262626;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -1px;
+        }
+
+        .logo span {
+            color: var(--text-primary);
+            font-weight: 400;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .col-3 { grid-column: span 3; }
+        .col-4 { grid-column: span 4; }
+        .col-6 { grid-column: span 6; }
+        .col-8 { grid-column: span 8; }
+        .col-12 { grid-column: span 12; }
+
+        .metric-card {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .metric-sublabel {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 300px;
+        }
+
+        .chart-container-tall {
+            height: 400px;
+        }
+
+        .chart-container-gauge {
+            height: 220px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 32px 0 16px 0;
+            padding-left: 12px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            color: var(--error);
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .col-3 { grid-column: span 6; }
+            .col-4 { grid-column: span 6; }
+        }
+
+        @media (max-width: 768px) {
+            .col-3, .col-4, .col-6 { grid-column: span 12; }
+            .header { flex-direction: column; gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">VIRTUOSO<span> Analytics</span></div>
+        <div class="status-badge">
+            <div class="status-dot"></div>
+            <span id="health-status">Connecting...</span>
+        </div>
+    </div>
+
+    <!-- Key Metrics Row -->
+    <div class="dashboard-grid">
+        <div class="card col-3 metric-card">
+            <div class="metric-value" id="total-volume">--</div>
+            <div class="metric-label">24h Volume</div>
+            <div class="metric-sublabel" id="volume-exchanges">-- exchanges</div>
+        </div>
+        <div class="card col-3 metric-card">
+            <div class="metric-value" id="total-oi">--</div>
+            <div class="metric-label">Open Interest</div>
+            <div class="metric-sublabel" id="oi-change">aggregate</div>
+        </div>
+        <div class="card col-3 metric-card">
+            <div class="metric-value" id="avg-funding">--</div>
+            <div class="metric-label">Avg Funding Rate</div>
+            <div class="metric-sublabel" id="funding-annualized">-- annualized</div>
+        </div>
+        <div class="card col-3 metric-card">
+            <div class="metric-value" id="long-short">--</div>
+            <div class="metric-label">Long/Short Ratio</div>
+            <div class="metric-sublabel" id="ls-sources">-- sources</div>
+        </div>
+    </div>
+
+    <div class="section-title">Market Overview</div>
+
+    <div class="dashboard-grid">
+        <!-- Volume Treemap -->
+        <div class="card col-6">
+            <div class="card-header">
+                <span class="card-title">Volume Distribution by Exchange</span>
+                <span class="card-value">Treemap</span>
+            </div>
+            <div id="volume-treemap" class="chart-container chart-container-tall"></div>
+        </div>
+
+        <!-- Open Interest Treemap -->
+        <div class="card col-6">
+            <div class="card-header">
+                <span class="card-title">Open Interest Distribution</span>
+                <span class="card-value">Treemap</span>
+            </div>
+            <div id="oi-treemap" class="chart-container chart-container-tall"></div>
+        </div>
+    </div>
+
+    <div class="section-title">Funding Rate Analysis</div>
+
+    <div class="dashboard-grid">
+        <!-- Funding Rate Diverging Bar -->
+        <div class="card col-8">
+            <div class="card-header">
+                <span class="card-title">Funding Rates by Exchange</span>
+                <span class="card-value">8hr Rate (Annualized)</span>
+            </div>
+            <div id="funding-bar" class="chart-container chart-container-tall"></div>
+        </div>
+
+        <!-- Funding Sentiment Gauge -->
+        <div class="card col-4">
+            <div class="card-header">
+                <span class="card-title">Funding Sentiment</span>
+                <span class="card-value">Market Bias Indicator</span>
+            </div>
+            <div id="funding-gauge" class="chart-container-gauge"></div>
+            <div style="text-align: center; margin-top: 12px;">
+                <div id="basis-status" style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: var(--primary);"></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Futures Basis Status</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title">DEX vs CEX Comparison</div>
+
+    <div class="dashboard-grid">
+        <!-- DEX/CEX Volume Comparison -->
+        <div class="card col-4">
+            <div class="card-header">
+                <span class="card-title">Volume Share</span>
+                <span class="card-value">DEX vs CEX</span>
+            </div>
+            <div id="dex-cex-volume" class="chart-container"></div>
+        </div>
+
+        <!-- DEX/CEX OI Comparison -->
+        <div class="card col-4">
+            <div class="card-header">
+                <span class="card-title">Open Interest Share</span>
+                <span class="card-value">DEX vs CEX</span>
+            </div>
+            <div id="dex-cex-oi" class="chart-container"></div>
+        </div>
+
+        <!-- Exchange Count -->
+        <div class="card col-4">
+            <div class="card-header">
+                <span class="card-title">Exchange Breakdown</span>
+                <span class="card-value">Count by Type</span>
+            </div>
+            <div id="exchange-count" class="chart-container"></div>
+        </div>
+    </div>
+
+    <div class="section-title">Long/Short Analysis</div>
+
+    <div class="dashboard-grid">
+        <!-- Long/Short Gauge -->
+        <div class="card col-6">
+            <div class="card-header">
+                <span class="card-title">Long vs Short Positions</span>
+                <span class="card-value">Market Sentiment</span>
+            </div>
+            <div id="long-short-gauge" class="chart-container"></div>
+        </div>
+
+        <!-- Exchange Volume Ranking -->
+        <div class="card col-6">
+            <div class="card-header">
+                <span class="card-title">Exchange Volume Ranking</span>
+                <span class="card-value">24h USD Volume</span>
+            </div>
+            <div id="exchange-ranking" class="chart-container chart-container-tall"></div>
+        </div>
+    </div>
+
+    <script>
+        // Virtuoso Brand Colors
+        const COLORS = {
+            primary: '#fbbf24',
+            secondary: '#06B6D4',
+            success: '#10b981',
+            error: '#ef4444',
+            warning: '#f59e0b',
+            bg: '#0a0a0a',
+            card: '#111111',
+            text: '#f5f5f5',
+            textMuted: '#a3a3a3',
+            border: '#262626'
+        };
+
+        // Color scales for treemaps
+        const VOLUME_COLORS = [
+            '#0a0a0a', '#1a1a0a', '#2a2a0a', '#3a3a0a', '#4a4a0a',
+            '#5a5a0a', '#6a6a0a', '#7a6a0a', '#8a6a0a', '#9a6a0a',
+            '#aa7a0a', '#ba8a0a', '#ca9a0a', '#daaa0a', '#eaba0a',
+            '#fbbf24'
+        ];
+
+        const OI_COLORS = [
+            '#0a0a0a', '#0a1a1a', '#0a2a2a', '#0a3a3a', '#0a4a4a',
+            '#0a5a5a', '#0a6a6a', '#0a7a7a', '#0a8a8a', '#0a9a9a',
+            '#06B6D4'
+        ];
+
+        // Plotly layout defaults
+        const layoutDefaults = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: {
+                family: 'IBM Plex Mono, monospace',
+                color: COLORS.textMuted,
+                size: 11
+            },
+            margin: { l: 20, r: 20, t: 20, b: 20 },
+            showlegend: false
+        };
+
+        const config = {
+            displayModeBar: false,
+            responsive: true
+        };
+
+        // Utility functions
+        function formatVolume(value) {
+            if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+            if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+            if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+            return `$${value.toFixed(0)}`;
+        }
+
+        function formatPercent(value) {
+            return `${value >= 0 ? '+' : ''}${value.toFixed(4)}%`;
+        }
+
+        // API fetch helper
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return null;
+            }
+        }
+
+        // Create Volume Treemap
+        function createVolumeTreemap(markets) {
+            const data = markets
+                .filter(m => m.volume_24h && m.volume_24h > 0)
+                .sort((a, b) => b.volume_24h - a.volume_24h);
+
+            const trace = {
+                type: 'treemap',
+                labels: data.map(m => m.exchange),
+                parents: data.map(() => ''),
+                values: data.map(m => m.volume_24h),
+                text: data.map(m => formatVolume(m.volume_24h)),
+                textinfo: 'label+text',
+                textfont: {
+                    family: 'IBM Plex Mono',
+                    size: 12,
+                    color: COLORS.text
+                },
+                marker: {
+                    colors: data.map(m => m.volume_24h),
+                    colorscale: [
+                        [0, '#1a1a0a'],
+                        [0.3, '#4a4a0a'],
+                        [0.6, '#8a6a0a'],
+                        [1, '#fbbf24']
+                    ],
+                    line: { width: 2, color: COLORS.bg }
+                },
+                hovertemplate: '<b>%{label}</b><br>Volume: %{text}<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 10, r: 10, t: 10, b: 10 }
+            };
+
+            Plotly.newPlot('volume-treemap', [trace], layout, config);
+        }
+
+        // Create OI Treemap
+        function createOITreemap(markets) {
+            const data = markets
+                .filter(m => m.open_interest && m.open_interest > 0)
+                .sort((a, b) => b.open_interest - a.open_interest);
+
+            const trace = {
+                type: 'treemap',
+                labels: data.map(m => m.exchange),
+                parents: data.map(() => ''),
+                values: data.map(m => m.open_interest),
+                text: data.map(m => formatVolume(m.open_interest)),
+                textinfo: 'label+text',
+                textfont: {
+                    family: 'IBM Plex Mono',
+                    size: 12,
+                    color: COLORS.text
+                },
+                marker: {
+                    colors: data.map(m => m.open_interest),
+                    colorscale: [
+                        [0, '#0a1a1a'],
+                        [0.3, '#0a4a4a'],
+                        [0.6, '#0a8a8a'],
+                        [1, '#06B6D4']
+                    ],
+                    line: { width: 2, color: COLORS.bg }
+                },
+                hovertemplate: '<b>%{label}</b><br>Open Interest: %{text}<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 10, r: 10, t: 10, b: 10 }
+            };
+
+            Plotly.newPlot('oi-treemap', [trace], layout, config);
+        }
+
+        // Create Funding Rate Bar Chart
+        function createFundingBar(fundingData) {
+            const exchanges = fundingData.exchanges
+                .filter(e => e.funding_rate !== null)
+                .sort((a, b) => b.annualized_pct - a.annualized_pct);
+
+            const trace = {
+                type: 'bar',
+                orientation: 'h',
+                y: exchanges.map(e => e.exchange),
+                x: exchanges.map(e => e.annualized_pct),
+                text: exchanges.map(e => `${e.annualized_pct.toFixed(2)}%`),
+                textposition: 'outside',
+                textfont: {
+                    family: 'IBM Plex Mono',
+                    size: 11,
+                    color: COLORS.textMuted
+                },
+                marker: {
+                    color: exchanges.map(e => e.annualized_pct >= 0 ? COLORS.success : COLORS.error),
+                    line: { width: 0 }
+                },
+                hovertemplate: '<b>%{y}</b><br>Annualized: %{x:.2f}%<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 120, r: 80, t: 20, b: 40 },
+                xaxis: {
+                    title: { text: 'Annualized Rate (%)', font: { size: 11, color: COLORS.textMuted } },
+                    zeroline: true,
+                    zerolinecolor: COLORS.border,
+                    zerolinewidth: 2,
+                    gridcolor: COLORS.border,
+                    gridwidth: 1,
+                    tickfont: { size: 10, color: COLORS.textMuted }
+                },
+                yaxis: {
+                    tickfont: { size: 11, color: COLORS.text },
+                    automargin: true
+                }
+            };
+
+            Plotly.newPlot('funding-bar', [trace], layout, config);
+        }
+
+        // Create Funding Sentiment Gauge
+        function createFundingGauge(pulseData) {
+            const fundingPct = pulseData.funding_rate || 0;
+
+            // Map funding to -100 to 100 scale (assuming typical range is -0.1% to 0.1%)
+            const normalizedValue = Math.max(-100, Math.min(100, fundingPct * 1000));
+
+            const trace = {
+                type: 'indicator',
+                mode: 'gauge+number',
+                value: fundingPct,
+                number: {
+                    suffix: '%',
+                    font: { family: 'IBM Plex Mono', size: 28, color: COLORS.text }
+                },
+                gauge: {
+                    axis: {
+                        range: [-0.05, 0.15],
+                        tickwidth: 1,
+                        tickcolor: COLORS.border,
+                        tickfont: { size: 9, color: COLORS.textMuted },
+                        ticksuffix: '%'
+                    },
+                    bar: { color: COLORS.primary, thickness: 0.3 },
+                    bgcolor: COLORS.card,
+                    borderwidth: 0,
+                    steps: [
+                        { range: [-0.05, 0], color: 'rgba(239, 68, 68, 0.3)' },
+                        { range: [0, 0.05], color: 'rgba(16, 185, 129, 0.2)' },
+                        { range: [0.05, 0.1], color: 'rgba(16, 185, 129, 0.4)' },
+                        { range: [0.1, 0.15], color: 'rgba(16, 185, 129, 0.6)' }
+                    ],
+                    threshold: {
+                        line: { color: COLORS.text, width: 3 },
+                        thickness: 0.8,
+                        value: fundingPct
+                    }
+                }
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 30, r: 30, t: 30, b: 10 },
+                height: 200
+            };
+
+            Plotly.newPlot('funding-gauge', [trace], layout, config);
+
+            document.getElementById('basis-status').textContent = pulseData.basis_status || 'N/A';
+        }
+
+        // Create DEX/CEX Volume Pie
+        function createDexCexVolume(dexCexData) {
+            const trace = {
+                type: 'pie',
+                values: [dexCexData.dex.volume_24h, dexCexData.cex.volume_24h],
+                labels: ['DEX', 'CEX'],
+                hole: 0.6,
+                textinfo: 'percent',
+                textfont: { family: 'IBM Plex Mono', size: 14, color: COLORS.text },
+                marker: {
+                    colors: [COLORS.secondary, COLORS.primary],
+                    line: { color: COLORS.bg, width: 3 }
+                },
+                hovertemplate: '<b>%{label}</b><br>%{value:$,.0f}<br>%{percent}<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                annotations: [{
+                    text: `${dexCexData.dex.volume_pct.toFixed(1)}%<br><span style="font-size:10px;color:${COLORS.textMuted}">DEX</span>`,
+                    showarrow: false,
+                    font: { family: 'IBM Plex Mono', size: 18, color: COLORS.secondary }
+                }]
+            };
+
+            Plotly.newPlot('dex-cex-volume', [trace], layout, config);
+        }
+
+        // Create DEX/CEX OI Pie
+        function createDexCexOI(dexCexData) {
+            const trace = {
+                type: 'pie',
+                values: [dexCexData.dex.open_interest, dexCexData.cex.open_interest],
+                labels: ['DEX', 'CEX'],
+                hole: 0.6,
+                textinfo: 'percent',
+                textfont: { family: 'IBM Plex Mono', size: 14, color: COLORS.text },
+                marker: {
+                    colors: [COLORS.secondary, COLORS.primary],
+                    line: { color: COLORS.bg, width: 3 }
+                },
+                hovertemplate: '<b>%{label}</b><br>%{value:$,.0f}<br>%{percent}<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                annotations: [{
+                    text: `${dexCexData.dex.oi_pct.toFixed(1)}%<br><span style="font-size:10px;color:${COLORS.textMuted}">DEX</span>`,
+                    showarrow: false,
+                    font: { family: 'IBM Plex Mono', size: 18, color: COLORS.secondary }
+                }]
+            };
+
+            Plotly.newPlot('dex-cex-oi', [trace], layout, config);
+        }
+
+        // Create Exchange Count Bar
+        function createExchangeCount(dexCexData) {
+            const trace = {
+                type: 'bar',
+                x: ['DEX', 'CEX'],
+                y: [dexCexData.dex.count, dexCexData.cex.count],
+                text: [dexCexData.dex.count, dexCexData.cex.count],
+                textposition: 'inside',
+                textfont: { family: 'IBM Plex Mono', size: 20, color: COLORS.text },
+                marker: {
+                    color: [COLORS.secondary, COLORS.primary],
+                    line: { width: 0 }
+                },
+                hovertemplate: '<b>%{x}</b><br>%{y} exchanges<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 40, r: 20, t: 20, b: 60 },
+                xaxis: {
+                    tickfont: { size: 12, color: COLORS.text }
+                },
+                yaxis: {
+                    gridcolor: COLORS.border,
+                    gridwidth: 1,
+                    tickfont: { size: 10, color: COLORS.textMuted }
+                }
+            };
+
+            Plotly.newPlot('exchange-count', [trace], layout, config);
+        }
+
+        // Create Long/Short Gauge
+        function createLongShortGauge(pulseData) {
+            const longPct = pulseData.long_pct || 50;
+            const shortPct = pulseData.short_pct || 50;
+
+            const trace = {
+                type: 'indicator',
+                mode: 'gauge+number+delta',
+                value: longPct,
+                number: {
+                    suffix: '% Long',
+                    font: { family: 'IBM Plex Mono', size: 24, color: COLORS.success }
+                },
+                delta: {
+                    reference: 50,
+                    suffix: '%',
+                    increasing: { color: COLORS.success },
+                    decreasing: { color: COLORS.error },
+                    font: { size: 14 }
+                },
+                gauge: {
+                    axis: {
+                        range: [0, 100],
+                        tickwidth: 1,
+                        tickcolor: COLORS.border,
+                        tickfont: { size: 10, color: COLORS.textMuted },
+                        ticksuffix: '%',
+                        dtick: 25
+                    },
+                    bar: { color: COLORS.success, thickness: 0.4 },
+                    bgcolor: COLORS.error,
+                    borderwidth: 0,
+                    steps: [
+                        { range: [0, 50], color: 'rgba(239, 68, 68, 0.4)' },
+                        { range: [50, 100], color: 'rgba(16, 185, 129, 0.2)' }
+                    ],
+                    threshold: {
+                        line: { color: COLORS.primary, width: 4 },
+                        thickness: 0.8,
+                        value: longPct
+                    }
+                }
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 30, r: 30, t: 50, b: 30 },
+                annotations: [{
+                    x: 0.5,
+                    y: -0.15,
+                    text: `Sources: ${pulseData.ls_sources ? pulseData.ls_sources.join(', ') : 'N/A'}`,
+                    showarrow: false,
+                    font: { size: 10, color: COLORS.textMuted }
+                }]
+            };
+
+            Plotly.newPlot('long-short-gauge', [trace], layout, config);
+        }
+
+        // Create Exchange Ranking Bar
+        function createExchangeRanking(markets) {
+            const sorted = markets
+                .filter(m => m.volume_24h && m.volume_24h > 0)
+                .sort((a, b) => b.volume_24h - a.volume_24h)
+                .slice(0, 10);
+
+            // Determine if DEX or CEX for coloring
+            const dexExchanges = ['dYdX v4', 'Jupiter Perps', 'Drift', 'AsterDEX', 'HyperLiquid'];
+
+            const trace = {
+                type: 'bar',
+                orientation: 'h',
+                y: sorted.map(m => m.exchange).reverse(),
+                x: sorted.map(m => m.volume_24h).reverse(),
+                text: sorted.map(m => formatVolume(m.volume_24h)).reverse(),
+                textposition: 'outside',
+                textfont: { family: 'IBM Plex Mono', size: 10, color: COLORS.textMuted },
+                marker: {
+                    color: sorted.map(m => dexExchanges.includes(m.exchange) ? COLORS.secondary : COLORS.primary).reverse(),
+                    line: { width: 0 }
+                },
+                hovertemplate: '<b>%{y}</b><br>Volume: %{text}<extra></extra>'
+            };
+
+            const layout = {
+                ...layoutDefaults,
+                margin: { l: 100, r: 80, t: 20, b: 40 },
+                xaxis: {
+                    title: { text: '24h Volume (USD)', font: { size: 11, color: COLORS.textMuted } },
+                    gridcolor: COLORS.border,
+                    gridwidth: 1,
+                    tickfont: { size: 9, color: COLORS.textMuted },
+                    tickformat: '.2s'
+                },
+                yaxis: {
+                    tickfont: { size: 11, color: COLORS.text }
+                }
+            };
+
+            Plotly.newPlot('exchange-ranking', [trace], layout, config);
+        }
+
+        // Update key metrics
+        function updateMetrics(marketsData, fundingData, pulseData) {
+            // Total Volume
+            const totalVolume = marketsData.markets.reduce((sum, m) => sum + (m.volume_24h || 0), 0);
+            document.getElementById('total-volume').textContent = formatVolume(totalVolume);
+            document.getElementById('volume-exchanges').textContent = `${marketsData.count} exchanges`;
+
+            // Total OI
+            const totalOI = marketsData.markets.reduce((sum, m) => sum + (m.open_interest || 0), 0);
+            document.getElementById('total-oi').textContent = formatVolume(totalOI);
+
+            // Avg Funding
+            if (fundingData) {
+                document.getElementById('avg-funding').textContent = formatPercent(fundingData.average_funding_pct);
+                const avgAnnualized = fundingData.exchanges.reduce((sum, e) => sum + (e.annualized_pct || 0), 0) / fundingData.exchanges.length;
+                document.getElementById('funding-annualized').textContent = `${avgAnnualized.toFixed(2)}% annualized`;
+            }
+
+            // Long/Short
+            if (pulseData) {
+                const ratio = (pulseData.long_pct / pulseData.short_pct).toFixed(2);
+                document.getElementById('long-short').textContent = `${ratio}:1`;
+                document.getElementById('ls-sources').textContent = pulseData.ls_sources ? pulseData.ls_sources.join(', ') : 'N/A';
+            }
+        }
+
+        // Main initialization
+        async function init() {
+            // Fetch all data in parallel
+            const [healthData, marketsData, fundingData, dexCexData, pulseData] = await Promise.all([
+                fetchAPI('health'),
+                fetchAPI('markets'),
+                fetchAPI('funding'),
+                fetchAPI('dex-cex'),
+                fetchAPI('perpetuals-pulse')
+            ]);
+
+            // Update health status
+            if (healthData) {
+                document.getElementById('health-status').textContent =
+                    `${healthData.status.toUpperCase()} - ${healthData.exchanges} exchanges`;
+            }
+
+            // Create visualizations
+            if (marketsData && marketsData.markets) {
+                createVolumeTreemap(marketsData.markets);
+                createOITreemap(marketsData.markets);
+                createExchangeRanking(marketsData.markets);
+            }
+
+            if (fundingData && fundingData.exchanges) {
+                createFundingBar(fundingData);
+            }
+
+            if (pulseData) {
+                createFundingGauge(pulseData);
+                createLongShortGauge(pulseData);
+            }
+
+            if (dexCexData) {
+                createDexCexVolume(dexCexData);
+                createDexCexOI(dexCexData);
+                createExchangeCount(dexCexData);
+            }
+
+            // Update metrics
+            if (marketsData) {
+                updateMetrics(marketsData, fundingData, pulseData);
+            }
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Auto-refresh every 60 seconds
+        setInterval(init, 60000);
+    </script>
+</body>
+</html>

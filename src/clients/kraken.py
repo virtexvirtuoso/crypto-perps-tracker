@@ -135,21 +135,18 @@ class KrakenClient(BaseExchangeClient):
             mark_price = float(ticker.get('markPrice', 0))
             last_price = float(ticker.get('last', mark_price))  # Use mark if last not available
 
-            # Note: Kraken doesn't provide 24h open price in tickers endpoint
-            # Would need separate /historicalfundingrates or /ohlc endpoint
+            # Kraken provides change24h as percentage in the ticker response
+            price_change_24h_pct = float(ticker.get('change24h', 0)) if 'change24h' in ticker else None
 
             return SymbolData(
                 exchange=self.exchange_type,
                 symbol=symbol,
                 price=last_price,
                 volume_24h=float(ticker.get('volumeQuote', 0)),
-                price_change_24h=None,  # Not available in tickers
-                price_change_pct=None,  # Not available in tickers
-                high_24h=None,          # Not available in tickers
-                low_24h=None,           # Not available in tickers
-                trades_24h=None,        # Not available in tickers
+                price_change_24h_pct=price_change_24h_pct,
                 open_interest=float(ticker.get('openInterest', 0)) * mark_price if 'openInterest' in ticker else None,
-                funding_rate=float(ticker.get('fundingRate', 0)) * 100 if 'fundingRate' in ticker else None
+                funding_rate=float(ticker.get('fundingRate', 0)) * 100 if 'fundingRate' in ticker else None,
+                num_trades=None  # Not available in Kraken tickers
             )
 
         except Exception as e:

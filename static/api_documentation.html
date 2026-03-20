@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Perps Tracker - API Documentation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            /* Virtuoso Brand Colors */
+            --neon-amber: #fbbf24;
+            --neon-amber-dim: rgba(251, 191, 36, 0.5);
+            --neon-cyan: #06B6D4;
+            --neon-red: #ff0066;
+
+            /* Dark Mode Colors */
+            --dark-bg-primary: #0a0a0a;
+            --dark-bg-secondary: #111111;
+            --dark-bg-tertiary: #1a1a1a;
+            --dark-border: #222222;
+            --dark-border-hover: #333333;
+            --dark-text-primary: #e0e0e0;
+            --dark-text-secondary: #9ca3af;
+            --dark-text-tertiary: #6b7280;
+
+            /* Semantic Colors */
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+
+            /* JSON Syntax Colors */
+            --json-key: #fbbf24;
+            --json-string: #10b981;
+            --json-number: #06B6D4;
+            --json-boolean: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark-bg-primary);
+            color: var(--dark-text-primary);
+            line-height: 1.6;
+        }
+
+        .font-mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* Grid overlay */
+        .grid-overlay {
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            min-height: 100vh;
+        }
+
+        /* Neon Effects */
+        .neon-text {
+            color: var(--neon-amber);
+            text-shadow: 0 0 10px var(--neon-amber);
+        }
+
+        .neon-border {
+            border: 1px solid var(--neon-amber);
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+        }
+
+        .glow-on-hover {
+            transition: all 0.3s ease;
+        }
+
+        .glow-on-hover:hover {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.05);
+            z-index: 100;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-amber), #fcd34d);
+            box-shadow: 0 0 10px var(--neon-amber);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Sticky Navigation */
+        .sticky-nav {
+            position: sticky;
+            top: 3px;
+            background: rgba(10, 10, 10, 0.95);
+            border-bottom: 1px solid var(--dark-border);
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-brand-icon {
+            color: var(--neon-amber);
+            font-size: 1.5rem;
+        }
+
+        .nav-brand-text {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .nav-subtitle {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--dark-text-tertiary);
+            margin-left: 0.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            color: var(--dark-text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: 'IBM Plex Mono', monospace;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--neon-amber);
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 4rem 0 3rem;
+            border-bottom: 1px solid var(--dark-border);
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--dark-text-secondary);
+            font-size: 1.1rem;
+            font-family: 'IBM Plex Mono', monospace;
+            margin-bottom: 1rem;
+        }
+
+        .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--dark-text-tertiary);
+            margin-top: 1rem;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-amber);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.95); }
+        }
+
+        .base-url {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin: 2rem auto;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .base-url:hover {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.1);
+        }
+
+        .base-url code {
+            color: var(--neon-amber);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--neon-amber);
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+
+        .stat-label {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--dark-text-tertiary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.5rem;
+        }
+
+        /* Sections */
+        .section {
+            margin: 3rem 0;
+        }
+
+        .section-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--dark-border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--dark-text-primary);
+        }
+
+        .section-icon {
+            font-size: 1.2rem;
+            color: var(--neon-amber);
+        }
+
+        /* Endpoint Cards */
+        .endpoint {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .endpoint:hover {
+            border-color: var(--dark-border-hover);
+        }
+
+        .endpoint.expanded {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.1);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            gap: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .endpoint-header:hover {
+            background: var(--dark-bg-tertiary);
+        }
+
+        .method {
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .method-get {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .endpoint-path {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--dark-text-primary);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .endpoint-desc {
+            color: var(--dark-text-tertiary);
+            margin-left: auto;
+            font-size: 0.85rem;
+        }
+
+        .expand-icon {
+            color: var(--dark-text-tertiary);
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+        }
+
+        .endpoint.expanded .expand-icon {
+            transform: rotate(180deg);
+            color: var(--neon-amber);
+        }
+
+        .endpoint-details {
+            display: none;
+            padding: 1.5rem;
+            border-top: 1px solid var(--dark-border);
+            background: var(--dark-bg-primary);
+        }
+
+        .endpoint.expanded .endpoint-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--neon-amber);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .detail-section p {
+            color: var(--dark-text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: #000;
+            border: 1px solid var(--dark-border);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            overflow-x: auto;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+        }
+
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .json-key { color: var(--json-key); }
+        .json-string { color: var(--json-string); }
+        .json-number { color: var(--json-number); }
+        .json-boolean { color: var(--json-boolean); }
+        .json-null { color: var(--dark-text-tertiary); }
+
+        /* Parameter Tables */
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .param-table th,
+        .param-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--dark-border);
+        }
+
+        .param-table th {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--dark-text-tertiary);
+            font-weight: 500;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .param-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .param-name {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--neon-amber);
+            font-weight: 500;
+        }
+
+        .param-type {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--neon-cyan);
+            font-size: 0.8rem;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tag-dex {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .tag-cex {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--neon-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        /* Exchange Grid */
+        .exchange-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .exchange-item {
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-border);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .exchange-item:hover {
+            border-color: var(--neon-amber);
+            background: var(--dark-bg-tertiary);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--dark-border);
+            margin-top: 3rem;
+        }
+
+        .footer-brand {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-text {
+            color: var(--dark-text-tertiary);
+            font-size: 0.85rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .footer-link {
+            color: var(--dark-text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-family: 'IBM Plex Mono', monospace;
+            transition: color 0.2s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--neon-amber);
+        }
+
+        /* Back to Top */
+        .back-to-top {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 48px;
+            height: 48px;
+            background: rgba(17, 17, 17, 0.95);
+            border: 1px solid var(--dark-border);
+            border-radius: 12px;
+            color: var(--neon-amber);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 40;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .endpoint-header {
+                flex-wrap: wrap;
+            }
+
+            .endpoint-desc {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 0.5rem;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay">
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+        </div>
+
+        <!-- Sticky Navigation -->
+        <nav class="sticky-nav">
+            <div class="nav-inner">
+                <div class="nav-brand">
+                    <i class="fas fa-chart-line nav-brand-icon"></i>
+                    <span class="nav-brand-text neon-text">PERPS TRACKER</span>
+                    <span class="nav-subtitle">// API DOCS</span>
+                </div>
+                <div class="nav-links">
+                    <a href="#health" class="nav-link">Health</a>
+                    <a href="#markets" class="nav-link">Markets</a>
+                    <a href="#exchanges" class="nav-link">Exchanges</a>
+                    <a href="#analysis" class="nav-link">Analysis</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Header -->
+            <header>
+                <h1 class="neon-text">CRYPTO PERPS TRACKER</h1>
+                <p class="subtitle">API DOCUMENTATION</p>
+                <p style="color: var(--dark-text-secondary); font-size: 0.95rem;">
+                    Real-time perpetual futures market data across 14 exchanges
+                </p>
+                <div class="base-url">
+                    Base URL: <code>http://5.223.63.4:8050</code>
+                </div>
+                <div class="version-badge">
+                    <span class="pulse-dot"></span>
+                    <span>VERSION 1.0</span>
+                    <span style="margin: 0 0.5rem;">|</span>
+                    <span>LIVE DATA</span>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">14</div>
+                    <div class="stat-label">Exchanges</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">DEXs Tracked</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">20</div>
+                    <div class="stat-label">API Endpoints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">~$172B</div>
+                    <div class="stat-label">24h Volume</div>
+                </div>
+            </div>
+
+            <!-- Health & Status Section -->
+            <section class="section" id="health">
+                <h2 class="section-title">
+                    <i class="fas fa-heartbeat section-icon"></i>
+                    Health & Status
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/health</span>
+                        <span class="endpoint-desc">Basic health check</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns basic health status of the dashboard service.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"healthy"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"service"</span>: <span class="json-string">"dashboard"</span>
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/health</span>
+                        <span class="endpoint-desc">API health with exchange count</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns API health status including the number of available exchanges.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"healthy"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"exchanges"</span>: <span class="json-number">14</span>
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/status</span>
+                        <span class="endpoint-desc">Detailed system status</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns comprehensive system status including exchange availability and cache configuration.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"operational"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"exchanges"</span>: {
+    <span class="json-key">"available"</span>: [<span class="json-string">"binance"</span>, <span class="json-string">"bybit"</span>, ...],
+    <span class="json-key">"active"</span>: <span class="json-number">12</span>,
+    <span class="json-key">"total"</span>: <span class="json-number">14</span>
+  },
+  <span class="json-key">"cache"</span>: {
+    <span class="json-key">"ttl"</span>: <span class="json-number">60</span>
+  }
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Market Overview Section -->
+            <section class="section" id="markets">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-bar section-icon"></i>
+                    Market Overview
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/markets</span>
+                        <span class="endpoint-desc">All market data from all exchanges</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns comprehensive market data from all exchanges including volume, open interest, funding rates, and top trading pairs.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"count"</span>: <span class="json-number">12</span>,
+  <span class="json-key">"markets"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Binance"</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">64682647614.07</span>,
+      <span class="json-key">"open_interest"</span>: <span class="json-number">19876543210.50</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.00007465</span>,
+      <span class="json-key">"market_count"</span>: <span class="json-number">350</span>,
+      <span class="json-key">"top_pairs"</span>: [
+        {<span class="json-key">"symbol"</span>: <span class="json-string">"BTCUSDT"</span>, <span class="json-key">"volume"</span>: <span class="json-number">15000000000</span>}
+      ]
+    }
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/markets/summary</span>
+                        <span class="endpoint-desc">Aggregated market summary</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns aggregated market summary across all exchanges.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"total_volume_24h"</span>: <span class="json-number">172254413578.76</span>,
+  <span class="json-key">"total_open_interest"</span>: <span class="json-number">50925157264.90</span>,
+  <span class="json-key">"exchange_count"</span>: <span class="json-number">12</span>
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/markets/volume</span>
+                        <span class="endpoint-desc">Total 24h volume</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns total 24-hour trading volume across all exchanges.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"total_volume_24h"</span>: <span class="json-number">172254413578.76</span>,
+  <span class="json-key">"formatted"</span>: <span class="json-string">"$172.25B"</span>
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/markets/open-interest</span>
+                        <span class="endpoint-desc">Total open interest</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns total open interest across all exchanges.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"total_open_interest"</span>: <span class="json-number">50925157264.90</span>,
+  <span class="json-key">"formatted"</span>: <span class="json-string">"$50.93B"</span>
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Exchange Data Section -->
+            <section class="section" id="exchanges">
+                <h2 class="section-title">
+                    <i class="fas fa-building section-icon"></i>
+                    Exchange Data
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/exchanges</span>
+                        <span class="endpoint-desc">List all available exchanges</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns a list of all available exchanges that can be queried.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Available Exchanges</div>
+                            <div class="exchange-grid">
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Binance</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Bybit</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> OKX</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Gate.io</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Kraken</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> KuCoin</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Bitget</div>
+                                <div class="exchange-item"><span class="tag tag-cex">CEX</span> Coinbase INTX</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> HyperLiquid</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> dYdX</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> Jupiter Perps</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> Drift</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> AsterDEX</div>
+                            </div>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"count"</span>: <span class="json-number">14</span>,
+  <span class="json-key">"exchanges"</span>: [
+    <span class="json-string">"binance"</span>, <span class="json-string">"bybit"</span>, <span class="json-string">"gateio"</span>, <span class="json-string">"bitget"</span>,
+    <span class="json-string">"okx"</span>, <span class="json-string">"hyperliquid"</span>, <span class="json-string">"dydx"</span>, <span class="json-string">"coinbase_intx"</span>,
+    <span class="json-string">"asterdex"</span>, <span class="json-string">"kraken"</span>, <span class="json-string">"kucoin"</span>, <span class="json-string">"coinbase"</span>,
+    <span class="json-string">"jupiter"</span>, <span class="json-string">"drift"</span>
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/exchanges/{exchange}</span>
+                        <span class="endpoint-desc">Data for a specific exchange</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns detailed market data for a specific exchange.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Path Parameters</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><span class="param-name">exchange</span></td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td>Exchange name (e.g., "hyperliquid", "binance", "drift")</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example: /api/exchanges/hyperliquid</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"timestamp"</span>: <span class="json-string">"2025-12-18T00:00:00+00:00"</span>,
+  <span class="json-key">"exchange"</span>: <span class="json-string">"HyperLiquid"</span>,
+  <span class="json-key">"volume_24h"</span>: <span class="json-number">7654695514.10</span>,
+  <span class="json-key">"open_interest"</span>: <span class="json-number">6655444751.19</span>,
+  <span class="json-key">"funding_rate"</span>: <span class="json-number">0.0000125</span>,
+  <span class="json-key">"market_count"</span>: <span class="json-number">223</span>,
+  <span class="json-key">"top_pairs"</span>: [
+    {<span class="json-key">"symbol"</span>: <span class="json-string">"BTC"</span>, <span class="json-key">"volume"</span>: <span class="json-number">3663270748.16</span>},
+    {<span class="json-key">"symbol"</span>: <span class="json-string">"ETH"</span>, <span class="json-key">"volume"</span>: <span class="json-number">2332377427.63</span>}
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Symbol Lookup Section -->
+            <section class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-search section-icon"></i>
+                    Symbol Lookup
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/symbol/{symbol}</span>
+                        <span class="endpoint-desc">Cross-exchange symbol data</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns data for a specific symbol across all exchanges where it's available. Useful for comparing prices, volumes, and funding rates.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Path Parameters</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td><span class="param-name">symbol</span></td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td>Symbol to lookup (e.g., "BTC", "ETH", "SOL")</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example: /api/symbol/BTC</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"symbol"</span>: <span class="json-string">"BTC"</span>,
+  <span class="json-key">"exchanges"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"data"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"HyperLiquid"</span>,
+      <span class="json-key">"price"</span>: <span class="json-number">104500.00</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">3661640147.24</span>,
+      <span class="json-key">"open_interest"</span>: <span class="json-number">1905843102.44</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.0000125</span>
+    }
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- DEX vs CEX Analysis Section -->
+            <section class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-balance-scale section-icon"></i>
+                    DEX vs CEX Analysis
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/dex-cex</span>
+                        <span class="endpoint-desc">DEX vs CEX volume/OI breakdown</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns a breakdown of trading volume and open interest between decentralized exchanges (DEX) and centralized exchanges (CEX).</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">DEX Classification</div>
+                            <div class="exchange-grid">
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> HyperLiquid</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> dYdX</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> AsterDEX</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> Jupiter Perps</div>
+                                <div class="exchange-item"><span class="tag tag-dex">DEX</span> Drift</div>
+                            </div>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"cex"</span>: {
+    <span class="json-key">"count"</span>: <span class="json-number">9</span>,
+    <span class="json-key">"volume_24h"</span>: <span class="json-number">155968839485.89</span>,
+    <span class="json-key">"open_interest"</span>: <span class="json-number">43707563034.15</span>,
+    <span class="json-key">"volume_pct"</span>: <span class="json-number">90.55</span>,
+    <span class="json-key">"oi_pct"</span>: <span class="json-number">85.83</span>
+  },
+  <span class="json-key">"dex"</span>: {
+    <span class="json-key">"count"</span>: <span class="json-number">5</span>,
+    <span class="json-key">"volume_24h"</span>: <span class="json-number">16285574092.87</span>,
+    <span class="json-key">"open_interest"</span>: <span class="json-number">7217594230.75</span>,
+    <span class="json-key">"volume_pct"</span>: <span class="json-number">9.45</span>,
+    <span class="json-key">"oi_pct"</span>: <span class="json-number">14.17</span>
+  }
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Funding Rates Section -->
+            <section class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-coins section-icon"></i>
+                    Funding Rates
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/funding</span>
+                        <span class="endpoint-desc">Funding rates from all exchanges</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Returns funding rates from all exchanges, sorted by rate, with volume-weighted average calculation.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Calculation</div>
+                            <p>Annualized % = funding_rate × 100 × 3 × 365 (assuming 8-hour intervals)</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"average_funding_rate"</span>: <span class="json-number">0.0000527</span>,
+  <span class="json-key">"average_funding_pct"</span>: <span class="json-number">0.00527</span>,
+  <span class="json-key">"exchanges"</span>: [
+    {
+      <span class="json-key">"exchange"</span>: <span class="json-string">"Gate.io"</span>,
+      <span class="json-key">"funding_rate"</span>: <span class="json-number">0.000088</span>,
+      <span class="json-key">"funding_rate_pct"</span>: <span class="json-number">0.0088</span>,
+      <span class="json-key">"annualized_pct"</span>: <span class="json-number">9.64</span>,
+      <span class="json-key">"volume_24h"</span>: <span class="json-number">21058807349.00</span>
+    }
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tier 1: Direct Alpha Section -->
+            <section class="section" id="analysis">
+                <h2 class="section-title">
+                    <i class="fas fa-gem section-icon"></i>
+                    Tier 1: Direct Alpha Opportunities
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/funding-arbitrage</span>
+                        <span class="endpoint-desc">Cross-exchange funding rate arbitrage</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Identifies cross-exchange funding rate spreads for delta-neutral arbitrage opportunities.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Trading Signal</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Condition</th>
+                                    <th>Action</th>
+                                </tr>
+                                <tr>
+                                    <td>Spread > 0.005% (5.5% annualized)</td>
+                                    <td>Execute delta-neutral position</td>
+                                </tr>
+                                <tr>
+                                    <td>Annualized return > 10%</td>
+                                    <td>High priority opportunity</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Example Response</div>
+                            <div class="code-block">
+<pre>{
+  <span class="json-key">"status"</span>: <span class="json-string">"success"</span>,
+  <span class="json-key">"opportunities"</span>: [
+    {
+      <span class="json-key">"long_exchange"</span>: <span class="json-string">"Drift"</span>,
+      <span class="json-key">"short_exchange"</span>: <span class="json-string">"Gate.io"</span>,
+      <span class="json-key">"spread"</span>: <span class="json-number">0.001451</span>,
+      <span class="json-key">"annualized_return_pct"</span>: <span class="json-number">15.88</span>
+    }
+  ]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/oi-price-divergence</span>
+                        <span class="endpoint-desc">OI vs Price divergence detector</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Detects divergences between open interest changes and price movements - a leading indicator for potential reversals.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Signal Interpretation</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Signal</th>
+                                    <th>Meaning</th>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--error);">BEARISH_DIVERGENCE</span></td>
+                                    <td>Price rising but OI falling - weak rally</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--success);">BULLISH_DIVERGENCE</span></td>
+                                    <td>Price falling but OI rising - accumulation</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/funding-extremity</span>
+                        <span class="endpoint-desc">Extreme funding rate detector</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Identifies exchanges with extreme funding rates using z-score analysis - signals crowded positioning.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Z-Score Thresholds</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Z-Score</th>
+                                    <th>Signal</th>
+                                </tr>
+                                <tr>
+                                    <td>> 2.0</td>
+                                    <td>Extreme long crowding - fade longs</td>
+                                </tr>
+                                <tr>
+                                    <td>< -2.0</td>
+                                    <td>Extreme short crowding - fade shorts</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tier 2: Risk & Sentiment Section -->
+            <section class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-shield-alt section-icon"></i>
+                    Tier 2: Risk & Sentiment Intelligence
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/liquidation-risk-heatmap</span>
+                        <span class="endpoint-desc">Cross-exchange liquidation risk</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Generates a liquidation risk heatmap based on funding rates and OI concentration.</p>
+                        </div>
+                        <div class="detail-section">
+                            <div class="detail-title">Risk Levels</div>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Level</th>
+                                    <th>Score</th>
+                                    <th>Action</th>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--error);">CRITICAL</span></td>
+                                    <td>> 80</td>
+                                    <td>Reduce exposure immediately</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--warning);">HIGH</span></td>
+                                    <td>60-80</td>
+                                    <td>Consider hedging</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--success);">LOW</span></td>
+                                    <td>< 40</td>
+                                    <td>Normal conditions</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/market-sentiment-index</span>
+                        <span class="endpoint-desc">Composite sentiment indicator</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Composite sentiment score (0-100) based on funding rates and DEX vs CEX flow dynamics.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/oi-concentration</span>
+                        <span class="endpoint-desc">Market concentration analysis (HHI)</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Measures market concentration using Herfindahl-Hirschman Index (HHI) for volume and OI distribution.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tier 3: Flow Analysis Section -->
+            <section class="section">
+                <h2 class="section-title">
+                    <i class="fas fa-exchange-alt section-icon"></i>
+                    Tier 3: Flow Analysis
+                </h2>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/dex-cex-flow-dynamics</span>
+                        <span class="endpoint-desc">DEX/CEX flow momentum</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Tracks flow dynamics between decentralized and centralized exchanges.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/exchange-flow-migration</span>
+                        <span class="endpoint-desc">Volume migration patterns</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Detects volume migration patterns between exchanges.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint" onclick="toggleEndpoint(this)">
+                    <div class="endpoint-header">
+                        <span class="method method-get">GET</span>
+                        <span class="endpoint-path">/api/analysis/volume-anomaly-detector</span>
+                        <span class="endpoint-desc">Unusual volume activity</span>
+                        <i class="fas fa-chevron-down expand-icon"></i>
+                    </div>
+                    <div class="endpoint-details">
+                        <div class="detail-section">
+                            <div class="detail-title">Description</div>
+                            <p>Detects unusual volume patterns that may indicate whale activity or market manipulation.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer>
+                <div class="footer-brand neon-text">PERPS TRACKER</div>
+                <p class="footer-text">Real-time perpetual futures market intelligence</p>
+                <div class="footer-links">
+                    <a href="http://5.223.63.4:8050" class="footer-link">Dashboard</a>
+                    <a href="#health" class="footer-link">API Docs</a>
+                </div>
+                <p style="margin-top: 2rem; color: var(--dark-text-tertiary); font-size: 0.75rem;">
+                    Built with ♦ by Virtuoso Crypto
+                </p>
+            </footer>
+        </div>
+
+        <!-- Back to Top Button -->
+        <button class="back-to-top" id="backToTop" onclick="scrollToTop()">
+            <i class="fas fa-arrow-up"></i>
+        </button>
+    </div>
+
+    <script>
+        // Toggle endpoint expansion
+        function toggleEndpoint(el) {
+            el.classList.toggle('expanded');
+        }
+
+        // Progress bar
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progressBarFill').style.width = scrolled + '%';
+
+            // Back to top button
+            const backToTop = document.getElementById('backToTop');
+            if (winScroll > 300) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+
+        // Scroll to top
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 """Bitget exchange client"""
 
-from typing import List
+from typing import List, Dict, Any
+from datetime import datetime
 from src.clients.base import BaseExchangeClient
 from src.models.market import MarketData, ExchangeType, TradingPair, SymbolData
 
@@ -10,6 +11,10 @@ class BitgetClient(BaseExchangeClient):
 
     Fetches trading volume, open interest, and market data from
     Bitget USDT-margined perpetual futures markets.
+
+    API Endpoints:
+        - /api/mix/v1/market/tickers - Ticker data
+        - /api/v2/mix/market/long-short - Long/short account ratio
     """
 
     @property
@@ -157,9 +162,9 @@ class BitgetClient(BaseExchangeClient):
             if response.get('code') != '00000' or not response.get('data'):
                 return None
             ticker = response['data']
-            
+
             last_price = float(ticker.get('last', 0))
-            
+
             return SymbolData(
                 exchange=self.exchange_type,
                 symbol=symbol,
@@ -172,3 +177,61 @@ class BitgetClient(BaseExchangeClient):
             )
         except Exception:
             return None
+
+    def fetch_long_short_ratio(
+        self,
+        symbol: str = "BTCUSDT",
+        period: str = "1h"
+    ) -> Dict[str, Any]:
+        """Fetch long/short account ratio from Bitget
+
+        Args:
+            symbol: Trading pair (e.g., 'BTCUSDT')
+            period: Time period (5m, 15m, 30m, 1h, 4h, 1Dutc)
+
+        Returns:
+            Dict with long/short ratio data:
+                - symbol: Trading pair
+                - long_short_ratio: Ratio of longs to shorts
+                - long_account_pct: Percentage of long accounts
+                - short_account_pct: Percentage of short accounts
+                - timestamp: Data timestamp
+
+        Raises:
+            ValueError: If API returns error
+            requests.RequestException: If request fails
+        """
+        # Bitget V2 API for long/short ratio
+        response = self._get(
+            "/api/v2/mix/market/long-short",
+            params={
+                "symbol": symbol,
+                "period": period,
+                "productType": "USDT-FUTURES"
+            }
+        )
+
+        if response.get('code') != '00000':
+            raise ValueError(f"API error: {response.get('msg', 'Unknown error')}")
+
+        data = response.get('data', [])
+        if not data:
+            raise ValueError(f"No long/short ratio data for {symbol}")
+
+        # Get most recent data point
+        latest = data[0] if isinstance(data, list) else data
+
+        long_ratio = float(latest.get('longRatio', 0))
+        short_ratio = float(latest.get('shortRatio', 0))
+
+        # Calculate L/S ratio
+        lsr = long_ratio / short_ratio if short_ratio > 0 else float('inf')
+
+        return {
+            'symbol': symbol,
+            'timestamp': datetime.fromtimestamp(int(latest.get('ts', 0)) / 1000),
+            'long_short_ratio': lsr,
+            'long_account_pct': long_ratio * 100,
+            'short_account_pct': short_ratio * 100,
+            'source': 'bitget'
+        }

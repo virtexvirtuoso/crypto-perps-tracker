@@ -20,6 +20,7 @@ class ExchangeType(str, Enum):
     KRAKEN = "Kraken"
     COINBASE = "Coinbase"
     KUCOIN = "KuCoin"
+    COINGECKO = "CoinGecko"
 
 
 class TradingPair(BaseModel):

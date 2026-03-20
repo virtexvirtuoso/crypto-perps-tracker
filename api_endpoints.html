@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Perps Tracker - API Endpoints</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            border-bottom: 2px solid #ffd700;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #ffd700;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1em;
+        }
+
+        .server-section {
+            margin-bottom: 50px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #ffa500;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(255, 165, 0, 0.2);
+        }
+
+        .server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ffa500;
+        }
+
+        .server-title {
+            color: #ffa500;
+            font-size: 1.8em;
+        }
+
+        .server-url {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 8px 15px;
+            border-radius: 5px;
+            color: #ffd700;
+            font-size: 0.9em;
+        }
+
+        .endpoint {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .endpoint:hover {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            transform: translateX(5px);
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .method {
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.85em;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .method-get {
+            background: #61affe;
+            color: #000;
+        }
+
+        .method-post {
+            background: #49cc90;
+            color: #000;
+        }
+
+        .method-ws {
+            background: #fca130;
+            color: #000;
+        }
+
+        .endpoint-path {
+            color: #ffd700;
+            font-size: 1.1em;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .test-btn {
+            background: linear-gradient(135deg, #ffd700, #ffa500);
+            color: #000;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Monaco', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .test-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .test-btn:active {
+            transform: scale(0.95);
+        }
+
+        .endpoint-description {
+            color: #bbb;
+            margin: 10px 0;
+            font-size: 0.95em;
+        }
+
+        .endpoint-details {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #444;
+        }
+
+        .endpoint-details.active {
+            display: block;
+        }
+
+        .param-section {
+            margin: 15px 0;
+        }
+
+        .param-label {
+            color: #ffa500;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .param-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #ffd700;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .response-container {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .response-container.active {
+            display: block;
+        }
+
+        .response-header {
+            color: #ffa500;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+
+        .status-success {
+            background: #49cc90;
+            color: #000;
+        }
+
+        .status-error {
+            background: #f93e3e;
+            color: #fff;
+        }
+
+        .response-body {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #555;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .response-body pre {
+            margin: 0;
+            color: #0f0;
+            font-size: 0.85em;
+        }
+
+        .loading {
+            color: #ffd700;
+            font-style: italic;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            background: rgba(255, 215, 0, 0.15);
+            color: #ffd700;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.75em;
+            margin: 5px 5px 5px 0;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .copy-btn {
+            background: rgba(97, 175, 254, 0.2);
+            border: 1px solid #61affe;
+            color: #61affe;
+            padding: 5px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-family: 'Monaco', monospace;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(97, 175, 254, 0.4);
+        }
+
+        .quick-links {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffa500;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+        }
+
+        .quick-links h3 {
+            color: #ffa500;
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .quick-links a {
+            display: block;
+            color: #ffd700;
+            text-decoration: none;
+            padding: 5px 0;
+            font-size: 0.9em;
+            transition: all 0.2s ease;
+        }
+
+        .quick-links a:hover {
+            transform: translateX(5px);
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .quick-links {
+                position: static;
+                margin-bottom: 20px;
+            }
+
+            .server-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .endpoint-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Crypto Perps Tracker API</h1>
+            <p class="subtitle">Interactive API Endpoint Explorer</p>
+        </header>
+
+        <div class="quick-links">
+            <h3>Quick Links</h3>
+            <a href="#derivatives-api">Derivatives Signals API</a>
+            <a href="#dashboard-api">Dashboard API</a>
+            <a href="http://localhost:8000/docs" target="_blank">📚 OpenAPI Docs</a>
+            <a href="http://localhost:8050" target="_blank">📊 Dashboard</a>
+        </div>
+
+        <!-- Derivatives Signals API -->
+        <div class="server-section" id="derivatives-api">
+            <div class="server-header">
+                <h2 class="server-title">Derivatives Signals API</h2>
+                <div class="server-url">http://localhost:8000</div>
+            </div>
+
+            <!-- Root -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/</span>
+                    <button class="test-btn" onclick="testEndpoint('http://localhost:8000/', 'root')">Test</button>
+                </div>
+                <div class="endpoint-description">API root with endpoint list and version info</div>
+                <div class="response-container" id="response-root"></div>
+            </div>
+
+            <!-- Health -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                    <button class="test-btn" onclick="testEndpoint('http://localhost:8000/health', 'health')">Test</button>
+                </div>
+                <div class="endpoint-description">Health check endpoint</div>
+                <div class="response-container" id="response-health"></div>
+            </div>
+
+            <!-- Symbols -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/symbols</span>
+                    <button class="test-btn" onclick="testEndpoint('http://localhost:8000/symbols', 'symbols')">Test</button>
+                </div>
+                <div class="endpoint-description">List of supported trading symbols (cached, dynamically fetched from Bybit)</div>
+                <div class="feature-badge">🔄 Cached (1 hour)</div>
+                <div class="feature-badge">📊 Volume Filtered ($5M+ / 24h)</div>
+                <div class="response-container" id="response-symbols"></div>
+            </div>
+
+            <!-- Funding Rate Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/funding-rate/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('funding-rate')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Funding rate extremes signal
+                    <br>📈 <strong>Buy:</strong> FR &lt; -0.05% and price &gt; 200-EMA
+                    <br>📉 <strong>Sell:</strong> FR &gt; +0.10% and price &lt; 200-EMA
+                </div>
+                <div class="endpoint-details" id="details-funding-rate">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-funding-rate-symbol" value="BTCUSDT" placeholder="e.g., BTCUSDT, ETHUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/funding-rate/', 'funding-rate', 'param-funding-rate-symbol')">Test</button>
+                    <div class="response-container" id="response-funding-rate"></div>
+                </div>
+            </div>
+
+            <!-- Open Interest Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/open-interest/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('open-interest')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Open interest surge + price divergence signal
+                    <br>🟢 <strong>Bullish:</strong> ΔOI% &gt; +30% and price falls &lt; -2%
+                    <br>🔴 <strong>Bearish:</strong> ΔOI% &gt; +30% and price rises &gt; +2%
+                </div>
+                <div class="endpoint-details" id="details-open-interest">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-open-interest-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/open-interest/', 'open-interest', 'param-open-interest-symbol')">Test</button>
+                    <div class="response-container" id="response-open-interest"></div>
+                </div>
+            </div>
+
+            <!-- Long/Short Ratio Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/long-short-ratio/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('long-short-ratio')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Long/short ratio skew signal
+                    <br>⚠️ <strong>Fade:</strong> LSR &gt; 3.0 (crowded longs) or &lt; 0.33 (crowded shorts)
+                </div>
+                <div class="endpoint-details" id="details-long-short-ratio">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-long-short-ratio-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/long-short-ratio/', 'long-short-ratio', 'param-long-short-ratio-symbol')">Test</button>
+                    <div class="response-container" id="response-long-short-ratio"></div>
+                </div>
+            </div>
+
+            <!-- Basis Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/basis/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('basis')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Perpetual vs spot basis divergence signal
+                    <br>📈 <strong>Buy:</strong> Basis &lt; -0.5% (contango discount)
+                    <br>📉 <strong>Sell:</strong> Basis &gt; +1% (backwardation premium)
+                </div>
+                <div class="endpoint-details" id="details-basis">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-basis-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/basis/', 'basis', 'param-basis-symbol')">Test</button>
+                    <div class="response-container" id="response-basis"></div>
+                </div>
+            </div>
+
+            <!-- CVD Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/cvd/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('cvd')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Cumulative Volume Delta signal
+                    <br>🟢 <strong>Bullish:</strong> CVD &gt; +500k USDT
+                    <br>🔴 <strong>Bearish:</strong> CVD &lt; -500k USDT
+                </div>
+                <div class="endpoint-details" id="details-cvd">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-cvd-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/cvd/', 'cvd', 'param-cvd-symbol')">Test</button>
+                    <div class="response-container" id="response-cvd"></div>
+                </div>
+            </div>
+
+            <!-- Options IV Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/options-iv/{base_coin}</span>
+                    <button class="test-btn" onclick="toggleDetails('options-iv')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Options implied volatility skew signal
+                    <br>📈 <strong>Buy:</strong> IV_Skew &gt; +15% (fear)
+                    <br>📉 <strong>Sell:</strong> IV_Skew &lt; -15% (complacency)
+                </div>
+                <div class="endpoint-details" id="details-options-iv">
+                    <div class="param-section">
+                        <div class="param-label">Base Coin:</div>
+                        <input type="text" class="param-input" id="param-options-iv-base_coin" value="BTC">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/options-iv/', 'options-iv', 'param-options-iv-base_coin')">Test</button>
+                    <div class="response-container" id="response-options-iv"></div>
+                </div>
+            </div>
+
+            <!-- Fusion Signal -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/fusion/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('fusion')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    ⭐ <strong>Composite fusion signal (HIGHEST EDGE - 78% win-rate)</strong>
+                    <br>Combines Funding + OI + LSR + CVD
+                    <br>🟢 <strong>Score ≥ +3:</strong> ENTER LONG
+                    <br>🔴 <strong>Score ≤ -3:</strong> ENTER SHORT
+                    <br>⚪ <strong>Score -2 to +2:</strong> WAIT
+                </div>
+                <div class="feature-badge">⭐ Premium Signal</div>
+                <div class="feature-badge">78% Win Rate</div>
+                <div class="endpoint-details" id="details-fusion">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-fusion-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/fusion/', 'fusion', 'param-fusion-symbol')">Test</button>
+                    <div class="response-container" id="response-fusion"></div>
+                </div>
+            </div>
+
+            <!-- All Signals -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/signals/all/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('all')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">Get all available signals for a symbol (individual signals + fusion)</div>
+                <div class="endpoint-details" id="details-all">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-all-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/signals/all/', 'all', 'param-all-symbol')">Test</button>
+                    <div class="response-container" id="response-all"></div>
+                </div>
+            </div>
+
+            <!-- Recommendation -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/recommendation/{symbol}</span>
+                    <button class="test-btn" onclick="toggleDetails('recommendation')">Configure & Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Human-readable trading recommendation with retail-friendly format
+                    <br>✨ Includes: Signal grade (A+ to F), action confidence, plain English explanation
+                </div>
+                <div class="feature-badge">📊 Retail-Friendly</div>
+                <div class="feature-badge">🎯 Actionable</div>
+                <div class="endpoint-details" id="details-recommendation">
+                    <div class="param-section">
+                        <div class="param-label">Symbol:</div>
+                        <input type="text" class="param-input" id="param-recommendation-symbol" value="BTCUSDT">
+                    </div>
+                    <button class="test-btn" onclick="testEndpointWithParam('http://localhost:8000/recommendation/', 'recommendation', 'param-recommendation-symbol')">Test</button>
+                    <div class="response-container" id="response-recommendation"></div>
+                </div>
+            </div>
+
+            <!-- WebSocket -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-ws">WS</span>
+                    <span class="endpoint-path">/ws/signals/{symbol}</span>
+                </div>
+                <div class="endpoint-description">
+                    Real-time signal streaming via WebSocket
+                    <br>Query params: <code>signal_type</code> (fusion, funding_rate, etc.), <code>interval</code> (seconds)
+                    <br>Example: <code>ws://localhost:8000/ws/signals/BTCUSDT?signal_type=fusion&interval=30</code>
+                </div>
+                <div class="feature-badge">🔄 Real-Time</div>
+                <div class="feature-badge">⚡ Live Updates</div>
+            </div>
+        </div>
+
+        <!-- Dashboard API -->
+        <div class="server-section" id="dashboard-api">
+            <div class="server-header">
+                <h2 class="server-title">Dashboard API</h2>
+                <div class="server-url">http://localhost:8050</div>
+            </div>
+
+            <!-- Health -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/health</span>
+                    <button class="test-btn" onclick="testEndpoint('http://localhost:8050/health', 'dashboard-health')">Test</button>
+                </div>
+                <div class="endpoint-description">Dashboard health check endpoint</div>
+                <div class="response-container" id="response-dashboard-health"></div>
+            </div>
+
+            <!-- Perpetuals Pulse -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/perpetuals-pulse</span>
+                    <button class="test-btn" onclick="testEndpoint('http://localhost:8050/api/perpetuals-pulse', 'perpetuals-pulse')">Test</button>
+                </div>
+                <div class="endpoint-description">
+                    Perpetual futures market metrics for external dashboard integration
+                    <br>📊 Returns: Funding rates, OI, Long/Short ratio, CEX/DEX split, Basis status
+                </div>
+                <div class="feature-badge">📈 Market Overview</div>
+                <div class="feature-badge">🏦 CEX/DEX Split</div>
+                <div class="feature-badge">📊 Multi-Exchange</div>
+                <div class="response-container" id="response-perpetuals-pulse"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDetails(endpointId) {
+            const details = document.getElementById(`details-${endpointId}`);
+            details.classList.toggle('active');
+        }
+
+        async function testEndpoint(url, responseId) {
+            const responseContainer = document.getElementById(`response-${responseId}`);
+            responseContainer.classList.add('active');
+            responseContainer.innerHTML = '<div class="loading">⏳ Loading...</div>';
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                const statusClass = response.ok ? 'status-success' : 'status-error';
+                const statusText = response.ok ? `${response.status} OK` : `${response.status} Error`;
+
+                responseContainer.innerHTML = `
+                    <div class="response-header">
+                        Response
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        <button class="copy-btn" onclick="copyToClipboard('response-body-${responseId}')">📋 Copy</button>
+                    </div>
+                    <div class="response-body">
+                        <pre id="response-body-${responseId}">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                responseContainer.innerHTML = `
+                    <div class="response-header">
+                        Error
+                        <span class="status-badge status-error">Failed</span>
+                    </div>
+                    <div class="response-body">
+                        <pre style="color: #f93e3e;">${error.message}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        async function testEndpointWithParam(baseUrl, responseId, paramInputId) {
+            const paramValue = document.getElementById(paramInputId).value;
+            const url = baseUrl + encodeURIComponent(paramValue);
+            await testEndpoint(url, responseId);
+        }
+
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>

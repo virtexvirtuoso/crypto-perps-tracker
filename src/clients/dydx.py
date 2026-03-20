@@ -140,7 +140,8 @@ class DYdXClient(BaseExchangeClient):
             oracle_price = float(market.get('oraclePrice', 0))
             price_change_24h = float(market.get('priceChange24H', 0))
 
-            # Calculate price change percentage
+            # Calculate price change percentage from API-provided priceChange24H field
+            # priceChange24H is the absolute price change, convert to percentage
             price_change_pct = None
             if oracle_price > 0:
                 price_change_pct = (price_change_24h / oracle_price) * 100

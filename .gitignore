@@ -77,3 +77,10 @@ htmlcov/
 # Distribution
 *.tar.gz
 *.zip
+
+# Backups
+backups/
+PROPRIETARY_FILES_BACKUP/
+
+# Examples (generated)
+examples/

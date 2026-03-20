@@ -150,12 +150,12 @@ class CoinbaseINTXClient(BaseExchangeClient):
                     quote = inst.get('quote', {})
 
                     mark_price = float(quote.get('mark_price', 0))
-                    settlement_price = float(quote.get('settlement_price', 0))
 
-                    # Calculate price change
+                    # Note: Coinbase INTX API does not provide 24h price change data
+                    # settlement_price is the last funding settlement, NOT the price from 24h ago
+                    # Available fields: mark_price, settlement_price, trade_price, notional_24hr
+                    # None of these allow accurate 24h price change calculation
                     price_change_pct = None
-                    if settlement_price > 0:
-                        price_change_pct = ((mark_price - settlement_price) / settlement_price) * 100
 
                     # Calculate OI
                     oi_value = float(inst.get('open_interest', 0)) * mark_price

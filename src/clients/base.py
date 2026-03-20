@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import requests
 from src.models.market import MarketData, ExchangeType, SymbolData
 import time
+import logging
 
 
 class BaseExchangeClient(ABC):
@@ -31,6 +32,7 @@ class BaseExchangeClient(ABC):
         self.retry_attempts = retry_attempts
         self.retry_delay = retry_delay
         self._session = requests.Session()
+        self._logger = logging.getLogger(self.__class__.__name__)
 
     @property
     @abstractmethod

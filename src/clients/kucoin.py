@@ -112,7 +112,7 @@ class KuCoinClient(BaseExchangeClient):
             SymbolData with price, volume, and available metrics
         """
         try:
-            # Get contract details
+            # Get contract details - this endpoint has all the data we need!
             contract_response = self._get(f"/api/v1/contracts/{symbol}")
 
             if contract_response.get('code') != '200000':
@@ -121,50 +121,34 @@ class KuCoinClient(BaseExchangeClient):
 
             contract = contract_response.get('data', {})
 
-            # Get ticker data
-            ticker_response = self._get("/api/v1/ticker", params={"symbol": symbol})
-
-            if ticker_response.get('code') != '200000':
-                self._logger.error(f"Ticker data not found for {symbol}")
-                return None
-
-            ticker = ticker_response.get('data')
-
-            if not ticker:
-                return None
-
-            # Calculate volume in USDT
-            vol_base = float(ticker.get('volume', 0))
-            last_price = float(ticker.get('price', 0))
+            # Extract data from contract endpoint
+            last_price = float(contract.get('lastTradePrice', contract.get('markPrice', 0)))
             multiplier = float(contract.get('multiplier', 1))
-            vol_usd = vol_base * last_price * multiplier
 
-            # Calculate OI in USDT
-            oi = float(ticker.get('openInterest', 0))
-            oi_usd = oi * last_price * multiplier if oi > 0 else None
+            # Volume: KuCoin provides turnoverOf24h in USDT directly
+            vol_usd = float(contract.get('turnoverOf24h', 0))
 
-            # Get funding rate
-            funding_rate = None
-            try:
-                funding_response = self._get(f"/api/v1/funding-rate/{symbol}/current")
-                if funding_response.get('code') == '200000':
-                    funding_data = funding_response.get('data', {})
-                    funding_rate = float(funding_data.get('value', 0)) * 100
-            except Exception:
-                pass
+            # Open Interest: Convert contracts to USDT
+            oi_contracts = float(contract.get('openInterest', 0))
+            oi_usd = oi_contracts * last_price * multiplier if oi_contracts > 0 else None
+
+            # Funding rate: Convert from decimal to percentage
+            funding_fee_rate = contract.get('fundingFeeRate')
+            funding_rate = float(funding_fee_rate) * 100 if funding_fee_rate is not None else None
+
+            # Price change: KuCoin provides priceChgPct as decimal (e.g., 0.0166 = 1.66%)
+            price_chg_pct = contract.get('priceChgPct')
+            price_change_pct = float(price_chg_pct) * 100 if price_chg_pct is not None else None
 
             return SymbolData(
                 exchange=self.exchange_type,
                 symbol=symbol,
                 price=last_price,
                 volume_24h=vol_usd,
-                price_change_24h=float(ticker.get('priceChg', 0)),
-                price_change_pct=float(ticker.get('changeRate', 0)) * 100,
-                high_24h=float(ticker.get('high', 0)),
-                low_24h=float(ticker.get('low', 0)),
-                trades_24h=None,  # Not available in ticker
+                price_change_24h_pct=price_change_pct,
                 open_interest=oi_usd,
-                funding_rate=funding_rate
+                funding_rate=funding_rate,
+                num_trades=None  # Not available in KuCoin contract data
             )
 
         except Exception as e:
