@@ -5,6 +5,8 @@ Sends Discord notifications when trading signals are generated.
 Integrates with Phase 2 signal generation system.
 """
 
+import os
+
 import requests
 import logging
 from typing import List, Dict, Any, Optional
@@ -15,8 +17,11 @@ from enum import Enum
 class SignalAlertConfig:
     """Configuration for signal alerts"""
 
-    # Discord webhook URL
-    WEBHOOK_URL = "https://discord.com/api/webhooks/1439697883199705270/4b608XidmYfCV48I1ZArvunQvUEqGGMw2N3rnXt-yJFUFdn3e1OxzRDvWTff-mQK9I5X"
+    # Discord webhook URL — env-driven (crypto-perps .env: DISCORD_WEBHOOK_URL).
+    # Was hardcoded to a webhook that was deleted from Discord — every send
+    # silently 404'd (2026-09-13 audit finding). Empty env = alerts disabled
+    # with a LOUD log line, never a silent failure.
+    WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
     # Alert thresholds (only send alerts meeting these criteria)
     MIN_CONFIDENCE = 0.5  # Only send signals with 50%+ confidence
@@ -206,6 +211,14 @@ class SignalAlertHandler:
         Returns:
             True if alert sent successfully
         """
+        # Fail loudly when no webhook is configured — never silently drop
+        if not self.webhook_url:
+            self.logger.error(
+                "Signal alerts disabled: DISCORD_WEBHOOK_URL not set — "
+                "configure it in ~/crypto-perps-tracker/.env"
+            )
+            return False
+
         # Filter signals that meet alerting criteria
         alertable_signals = [s for s in signals if self.should_alert(s)]
 
@@ -263,6 +276,10 @@ class SignalAlertHandler:
             'expected_move_pct': 4.5,
             'max_drawdown_risk_pct': 1.5
         }
+
+        if not self.webhook_url:
+            self.logger.error("Test alert skipped: no webhook URL configured")
+            return False
 
         try:
             embed = self.format_signal_embed(test_signal)
