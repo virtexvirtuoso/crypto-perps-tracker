@@ -30,7 +30,7 @@ venv311/
 # IDE
 .vscode/
 .idea/
-.claude/
+.claude/*
 *.swp
 *.swo
 *~
@@ -89,3 +89,6 @@ examples/
 *.bak
 *.bak.*
 *.bak2
+
+# Repo Sync Contract: the SessionStart hook is tracked
+!.claude/settings.json
