@@ -21,8 +21,17 @@ from src.signals.models import (
 from api.websocket import handle_websocket_connection
 from api.cache import signal_cache
 from api.routes.sector_rotation import router as sector_rotation_router, get_runner as get_sector_runner
-from api.routes.spot_rotation import router as spot_rotation_router
+from api.routes.spot_rotation import router as spot_rotation_router, get_runner as get_spot_runner
 from api.routes.aggregated import router as aggregated_router
+
+def _normalize_symbol(symbol: str) -> str:
+    """Ensure symbol has USDT suffix for Bybit API compatibility."""
+    s = symbol.upper().strip()
+    if not s.endswith('USDT'):
+        s = s + 'USDT'
+    return s
+
+
 import asyncio
 
 # Configure logging
@@ -118,6 +127,14 @@ async def warm_cache():
     except Exception as e:
         logger.warning(f"⚠️ Failed to auto-start sector rotation runner: {e}")
 
+    # Auto-start spot rotation background runner
+    try:
+        spot_runner = get_spot_runner()
+        asyncio.create_task(spot_runner.run_forever())
+        logger.info("🔄 Spot rotation background runner started automatically")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to auto-start spot rotation runner: {e}")
+
 
 @app.get("/")
 async def root():
@@ -184,6 +201,7 @@ async def get_funding_rate_signal(symbol: str = "BTCUSDT"):
         FundingRateSignal with direction, confidence, and metadata
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = calculator.calculate_funding_rate_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -205,6 +223,7 @@ async def get_open_interest_signal(symbol: str = "BTCUSDT"):
         OpenInterestSignal with divergence analysis
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = calculator.calculate_open_interest_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -225,6 +244,7 @@ async def get_long_short_ratio_signal(symbol: str = "BTCUSDT"):
         LongShortRatioSignal with crowd positioning
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = calculator.calculate_long_short_ratio_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -246,6 +266,7 @@ async def get_basis_signal(symbol: str = "BTCUSDT"):
         BasisSignal with arbitrage opportunity analysis
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = calculator.calculate_basis_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -267,6 +288,7 @@ async def get_cvd_signal(symbol: str = "BTCUSDT"):
         CVDSignal with hidden order flow analysis
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = calculator.calculate_cvd_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -319,6 +341,7 @@ async def get_fusion_signal(symbol: str = "BTCUSDT"):
         FusionSignal with composite score and entry recommendation
     """
     try:
+        symbol = _normalize_symbol(symbol)
         signal = fusion_engine.calculate_fusion_signal(symbol)
         return SignalResponse(success=True, signal=signal)
     except Exception as e:
@@ -339,6 +362,7 @@ async def get_all_signals(symbol: str = "BTCUSDT"):
         MultiSignalResponse with all signals
     """
     try:
+        symbol = _normalize_symbol(symbol)
         # Get all individual signals
         signals_dict = calculator.calculate_all_signals(symbol)
 
@@ -367,6 +391,7 @@ async def get_recommendation(symbol: str = "BTCUSDT"):
         Dict with recommendation summary
     """
     try:
+        symbol = _normalize_symbol(symbol)
         # Check cache first
         cache_key = f"recommendation:{symbol}"
         cached = signal_cache.get(cache_key)

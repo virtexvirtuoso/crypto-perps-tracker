@@ -13,7 +13,7 @@ class BitgetClient(BaseExchangeClient):
     Bitget USDT-margined perpetual futures markets.
 
     API Endpoints:
-        - /api/mix/v1/market/tickers - Ticker data
+        - /api/v2/mix/market/tickers - Ticker data (v2)
         - /api/v2/mix/market/long-short - Long/short account ratio
     """
 
@@ -37,10 +37,10 @@ class BitgetClient(BaseExchangeClient):
             requests.RequestException: If API request fails
             ValueError: If API returns error response
         """
-        # Fetch all USDT-margined perpetual tickers
+        # Fetch all USDT-margined perpetual tickers (v2)
         response = self._get(
-            "/api/mix/v1/market/tickers",
-            params={"productType": "umcbl"}
+            "/api/v2/mix/market/tickers",
+            params={"productType": "USDT-FUTURES"}
         )
 
         # Check for API error
@@ -57,13 +57,13 @@ class BitgetClient(BaseExchangeClient):
 
         # Calculate total open interest (holdingAmount * last price)
         total_oi = sum(
-            float(ticker.get('holdingAmount', 0)) * float(ticker.get('last', 0))
+            float(ticker.get('holdingAmount', 0)) * float(ticker.get('lastPr', 0))
             for ticker in tickers
         )
 
         # Get BTC funding rate for reference
         btc_ticker = next(
-            (t for t in tickers if t['symbol'] == 'BTCUSDT_UMCBL'),
+            (t for t in tickers if t['symbol'] == 'BTCUSDT'),
             {}
         )
         btc_funding = (
@@ -102,8 +102,8 @@ class BitgetClient(BaseExchangeClient):
 
         top_pairs = []
         for ticker in sorted_tickers[:limit]:
-            # Extract symbol (remove _UMCBL suffix)
-            symbol = ticker['symbol'].replace('_UMCBL', '')
+            # v2 symbols are already plain (e.g., BTCUSDT, no _UMCBL suffix)
+            symbol = ticker['symbol']
 
             # Extract base/quote (e.g., "BTCUSDT" -> BTC/USDT)
             if symbol.endswith('USDT'):
@@ -122,11 +122,11 @@ class BitgetClient(BaseExchangeClient):
 
         return top_pairs
 
-    def fetch_funding_rate(self, symbol: str = "BTCUSDT_UMCBL") -> float:
+    def fetch_funding_rate(self, symbol: str = "BTCUSDT") -> float:
         """Fetch current funding rate for a symbol
 
         Args:
-            symbol: Trading pair symbol (e.g., "BTCUSDT_UMCBL")
+            symbol: Trading pair symbol (e.g., "BTCUSDT")
 
         Returns:
             Current funding rate as decimal (e.g., 0.0001 = 0.01%)
@@ -136,8 +136,8 @@ class BitgetClient(BaseExchangeClient):
             requests.RequestException: If API request fails
         """
         response = self._get(
-            "/api/mix/v1/market/tickers",
-            params={"productType": "umcbl"}
+            "/api/v2/mix/market/tickers",
+            params={"productType": "USDT-FUTURES"}
         )
 
         if response.get('code') != '00000':
@@ -156,21 +156,35 @@ class BitgetClient(BaseExchangeClient):
 
     def fetch_symbol(self, symbol: str):
         """Fetch data for a specific symbol on Bitget"""
-        from typing import Optional
         try:
-            response = self._get("/api/mix/v1/market/ticker", params={"symbol": symbol, "productType": "umcbl"})
+            response = self._get(
+                "/api/v2/mix/market/ticker",
+                params={"symbol": symbol, "productType": "USDT-FUTURES"}
+            )
             if response.get('code') != '00000' or not response.get('data'):
                 return None
-            ticker = response['data']
 
-            last_price = float(ticker.get('last', 0))
+            # v2 returns data as a list; v1 returned an object. Handle both.
+            data = response['data']
+            if isinstance(data, list):
+                if not data:
+                    return None
+                ticker = data[0]
+            else:
+                ticker = data
+
+            last_price = float(ticker.get('lastPr', 0))
+
+            # v2 'change24h' is already a decimal fraction (e.g. -0.01132 = -1.132%)
+            change_raw = ticker.get('change24h')
+            price_change_pct = float(change_raw) * 100 if change_raw is not None else None
 
             return SymbolData(
                 exchange=self.exchange_type,
                 symbol=symbol,
                 price=last_price,
                 volume_24h=float(ticker.get('usdtVolume', 0)),
-                price_change_24h_pct=float(ticker.get('priceChangePercent', 0)) * 100 if ticker.get('priceChangePercent') else None,
+                price_change_24h_pct=price_change_pct,
                 open_interest=float(ticker.get('holdingAmount', 0)) * last_price,
                 funding_rate=float(ticker.get('fundingRate', 0)),
                 num_trades=None

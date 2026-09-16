@@ -34,7 +34,7 @@ def normalize_symbol_for_exchange(coin: str, exchange: str) -> str:
         'binance': f'{coin}USDT',
         'bybit': f'{coin}USDT',
         'okx': f'{coin}-USDT-SWAP',
-        'bitget': f'{coin}USDT_UMCBL',
+        'bitget': f'{coin}USDT',
         'gateio': f'{coin}_USDT'
     }
     return symbol_maps.get(exchange.lower(), f'{coin}USDT')

@@ -84,3 +84,8 @@ PROPRIETARY_FILES_BACKUP/
 
 # Examples (generated)
 examples/
+
+# no backup copies in the tree — git is the backup
+*.bak
+*.bak.*
+*.bak2

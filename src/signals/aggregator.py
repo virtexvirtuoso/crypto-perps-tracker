@@ -461,7 +461,7 @@ class AggregatedSignalCalculator:
             self._logger.warning(f"OKX funding fetch failed: {e}")
 
         try:
-            bitget_sym = f"{self._get_symbol_for_exchange(symbol, 'bitget')}_UMCBL"
+            bitget_sym = self._get_symbol_for_exchange(symbol, 'bitget')
             bitget_funding = self.bitget.fetch_funding_rate(bitget_sym)
             exchange_data['bitget'] = {
                 'funding_rate': bitget_funding,
@@ -1101,7 +1101,7 @@ class AggregatedSignalCalculator:
             self._logger.debug(f"OKX CEX funding failed: {e}")
 
         try:
-            bitget_sym = f"{self._get_symbol_for_exchange(symbol, 'bitget')}_UMCBL"
+            bitget_sym = self._get_symbol_for_exchange(symbol, 'bitget')
             bitget_funding = self.bitget.fetch_funding_rate(bitget_sym)
             cex_data['bitget'] = {
                 'funding_rate': bitget_funding,
